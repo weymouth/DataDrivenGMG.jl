@@ -1,0 +1,19 @@
+name = "TunedSmoother"
+uuid = "c3318569-70ec-4bfa-80a7-5209538697b8"
+authors = ["Gabriel Weymouth <gabriel.weymouth@gmail.com> and contributors"]
+version = "0.1.0"
+
+[deps]
+BenchmarkTools = "6e4b80f9-dd63-53aa-95a3-0cdb28fa8baf"
+CategoricalArrays = "324d7699-5711-5eae-9e2f-1d82baa6b597"
+DataStructures = "864edb3b-99cc-5e75-8d2d-829cb0a9cfe8"
+GeometricMultigrid = "ec3bce20-3e4b-4d8a-a801-89defc82be1c"
+LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
+Optim = "429524aa-4258-5aef-a3af-852621145aeb"
+StatsPlots = "f3b207a7-027a-5e70-b257-86293d7955fd"
+WaterLily = "ed894a53-35f9-47f1-b17f-85db9237eebd"
+
+[compat]
+julia = "1"
+
+[extras]
