@@ -7,6 +7,9 @@
 
 %% `Elsevier LaTeX' style
 \bibliographystyle{elsarticle-num}
+\usepackage{caption}
+\usepackage{subcaption}
+\usepackage{amsmath}
 %%%%%%%%%%%%%%%%%%%%%%%
 
 \begin{document}
@@ -33,11 +36,146 @@ pressure projection, linear algebra, data-driven
 
 \section{Introduction}
 
-Geometric Multigrid methods are among the fastest approach for the solution of variable coefficient discrete pressure Poisson equations posed on structured computational grids. 
+Pressure projection is a bottleneck in high-speed unsteady incompressible flow solvers. The pressure projection step typically makes up 25-50\% of the solution cost even in serial simulations, and the proportional cost grows in massively parallel simulations as the elliptic pressure Poisson equation requires communication throughout the computational domain instead of being confined to a local characteristic. Methods such as artificial-compressibility, smooth-particle-hydrodynamics, and particle-in-cell attempt to side-step this computational cost by modelling or otherwise under-resolving the pressure evolution compared to the fluid's momentum. However, these approaches lead to significant errors in pressure forces, thereby making them unsuitable for many applications or requiring explicit pressure corrections.
 
-\section{Approach}
+Recent advances in data-driven acceleration of flow solvers have mainly focused on data-assimilation methods and data-driven turbulence closures. Data-assimilation methods typically avoid the expensive pressure projection step entirely, focusing on applications where time-accurate pressure forces are not important. Data-driven closures for Large Eddy Simulation (LES) and Unsteady Reynolds Averaged Navier-Stokes (unRANS) and even Spanwise Averaged Navier-Stokes (SANS) simulations have seen growing success and are capable of accurate force prediction. Convolutional Neural Networks (CNN)s were introduced by () and are among the best data-driven methods for classification and regression of 2D images and 3D fields, having been applied in fluid dynamics applications from turbulence closures to super-resolution predictions. The translational symmetry built into the convolution ensures that correlations between the input and output anywhere in the data are generalized automatically. CNN architectures often use a restriction phase, where the size of the network is reduced before expanding again, to focus learning on a few key variables and further improve generalization of the method to unseen cases. However, the pressure projection step in these studies have not been augmented, leaving their acceleration as an open topic.
+
+Some recent work has focused on the pressure projection step explicitly. Chaotic projection methods for massively parallel systems; not data driven. Multi-grid data-driven decomposition; high errors and unclear speed-up. This work links develops a high-speed parameterized smoother which outperforms classic smoothing methods on eleven 2D and 3D benchmarks. Moreover, as the approach in linear in the pressure and scale-invariant, the parameters can be tuned on a coarse simulation and maintain their accelerated performance on the fine simulation. 
+
+\section{Data-driven Accelerated Solution of Linear Systems}
+
+The discrete Poisson equation at the heart of the projection step is defined as
+\begin{equation}
+    A x = b
+\end{equation}
+where $x$ is the desired pressure field vector, $b$ is the source term (proportional to the divergence of the velocity field to be projected), and $A$ is the Poisson matrix. For second-order conservative Poisson systems posed on structured grids in $M$ dimensions, $A$ is symmetric and has only $M$ non-zero sub-diagonals. This means matrix-vector multiplication $Ax$ has computational cost $O(NM)$ where $N$ is the number of elements in $x$. In addition each row and column of $A$ is zero-sum, meaning the matrix is negative semi-definite and has a single zero eigenvalue. 
+
+Iterative method update an approximate solution $x^k$ to a new solution $x^{k+1}$ with reduced error. As the problem is linear we can determine the update $\epsilon$ as
+\begin{equation}
+    A \epsilon^k = r^k \equiv b - Ax^k
+\end{equation}
+where $r$ is the residual. In practise, only an approximate solution for $\epsilon$ is obtained, after which the solution and residual are incremented
+\begin{equation}
+    x^{k+1} = x^k+\epsilon^k, \quad r^{k+1} = r^k-A\epsilon^k.
+\end{equation}
+This process is iterated until the residual is reduced sufficiently, the required tolerance level being highly dependant on the application.
+
+A Multi-grid (MG) method is effectively a \textit{linear} CNN architecture where the residual is restricted down to a reduced-size problem and the solution is prolongated back up. The restriction-solve-prolongation processes distributes the residual throughout the domain, which enables simple and relatively fast stationary methods such as Gauss-Sidel or Successive Over Relation (SOR) to \textit{smooth} the local high-frequency error in the projected solution. The MG architecture proceeds recursively on the reduced-size problems until a small linear algebra problem is reached which can be approximated with minimal cost. Because of their recursive nature, MG methods are among the fastest approaches for variable coefficient discrete pressure Poisson equations, demonstrating $N\log N$ scaling with the total size $N$ of the solution vector.
+
+When considering data-driven methods to accelerate the projection step, maintaining the linearity of the system is critical. However, this linearity needs only be maintained with respect to the input pressure field - the coefficients of the ``MG network'' could all potentially be adjusted to optimize performance for a specific sub-class of problems. 
+
+\section{Parameterized Smoother Approach}
+
+We define a simple parameterized Jacobi-like smoother as a sparse matrix multiplication, i.e. the correction $\epsilon$ is given by
+\begin{equation}
+    \epsilon = \tilde A^{-1}r
+\end{equation}
+after which the solution and residual are incremented as
+This means that applying the smoother requires no back-propagation and so can be implemented as a fast vector-operation in serial or even parallel simulations.
+
+The diagonal and off-diagonal coefficients of $\tilde A^{-1}$ are constructed separately
+\begin{equation}
+    \tilde a^{-1}_{ii} = \frac{f_D(a_{ii}/s|\theta_D)}{a_{ii}} , \quad
+    \tilde a^{-1}_{ij} = \frac{f_L(a_{ij}/s|\theta_L)}{a_{ii}}
+\end{equation}
+where the coefficients are scaled by $s=\max(a_{ij})$. 
+
+
+\begin{figure}
+    \centering
+    \begin{subfigure}[b]{0.3\textwidth}
+        \centering
+        \caption{2D-box}
+        \label{fig:2D-box}
+    \end{subfigure}
+    \begin{subfigure}[b]{0.3\textwidth}
+        \centering
+        \caption{2D-$\mu$}
+        \label{fig:2D-mu}
+    \end{subfigure}
+    \begin{subfigure}[b]{0.3\textwidth}
+        \centering
+        \caption{2D-sphere}
+        \label{fig:2D-sphere}
+    \end{subfigure}
+    \begin{subfigure}[b]{0.47\textwidth}
+        \centering
+        \includegraphics[width=\textwidth]{figures/crossloss.png}
+        \caption{$\log_{10}$ residual reduction}
+        \label{fig:cross plot}
+    \end{subfigure}
+    \hfill
+    \begin{subfigure}[b]{0.47\textwidth}
+        \centering
+        \includegraphics[width=\textwidth]{figures/crosscount.png}
+        \caption{Solver time}
+        \label{fig:synthetic time}
+    \end{subfigure}
+    \caption{(a-c) Sample solutions from the data-sets of three of the six synthetic cases. (d) Residual reduction over a single Multi-grid V-cycle on the `test' cases after tuning using the `train' case. Training case `union` refers to the smoother trained on all of the synthetic cases. (b) Time to reduce pressure residual by $10^{-3}$ for classical and parameterized smoothers on each synthetic case. Time is relative to the time of a single V-cycle using the Jacobi smoother.}
+    \label{fig:synthetic cases}
+\end{figure}
 
 \section{Results}
+
+\begin{figure}
+    \centering
+    \begin{subfigure}[b]{0.3\textwidth}
+        \centering
+        \caption{circle flow}
+        \label{fig:circle}
+    \end{subfigure}
+    \begin{subfigure}[b]{0.3\textwidth}
+        \centering
+        \caption{Taylor-Green Vortex}
+        \label{fig:TGV}
+    \end{subfigure}
+    \begin{subfigure}[b]{0.3\textwidth}
+        \centering
+        \caption{flapping wing}
+        \label{fig:donut}
+    \end{subfigure}
+    \begin{minipage}{0.45\textwidth}
+        \begin{subfigure}{\textwidth}
+        \centering
+        \caption{torus flow}
+        \label{fig:donut}
+        \end{subfigure}
+        \begin{subfigure}{\textwidth}
+        \centering
+        \caption{swimming shark}
+        \label{fig:donut}
+        \end{subfigure}
+    \end{minipage}
+    \hfill
+    \begin{subfigure}[b]{0.5\textwidth}
+        \centering
+        \includegraphics[width=\textwidth]{figures/compareloss.png}
+        \caption{$\log_{10}$ residual reduction}
+        \label{fig:synthetic time}
+    \end{subfigure}
+    \caption{(a-e) Snapshots from the five flow simulation cases. The Taylor-Green Vortex and torus flow are 3D cases, and the flapping wing and swimming shark have dynamic geometries. (f) Residual reduction over a single Multi-grid V-cycle for classical and parameterized smoothers on each case. The `transfer' smoother has been trained on the union of the synthetic data sets from Figure~\ref{fig:synthetic cases}.}
+    \label{fig:simulation cases}
+\end{figure}
+
+\begin{figure}
+    \centering
+    \begin{subfigure}[b]{0.48\textwidth}
+        \centering
+        \includegraphics[width=\textwidth]{figures/scaleloss.png}
+        \caption{$\log_{10}$ residual reduction}
+        \label{fig:scaled loss}
+    \end{subfigure}
+    \hfill
+    \begin{subfigure}[b]{0.48\textwidth}
+        \centering
+        \includegraphics[width=\textwidth]{figures/crosscount.png}
+        \caption{Solver time}
+        \label{fig:simulation time}
+    \end{subfigure}
+        \caption{(a) Residual reduction over a single Multi-grid V-cycle on the full-resolution case. The `transfer' smoother has been trained on the union of the synthetic data sets from Figure~\ref{fig:synthetic cases}. The $\frac 18, \frac 14, \frac 12$ smoothers have been trained on simulations with the indicated reduced resolution \textit{in each spacial and temporal dimension}. (b) Time to reduce pressure residual by $10^{-3}$ for classical and parameterized smoothers on each simulation case. Time is relative to the time of a single V-cycle using the Jacobi smoother.}
+        \label{fig:tuned simulation}
+\end{figure}
+
 
 \section{Conclusions}
 
