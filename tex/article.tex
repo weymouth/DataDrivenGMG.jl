@@ -1,0 +1,48 @@
+\documentclass[review]{elsarticle}
+
+\usepackage{lineno,hyperref}
+\modulolinenumbers[5]
+
+\journal{Journal of Computers and Fluids}
+
+%% `Elsevier LaTeX' style
+\bibliographystyle{elsarticle-num}
+%%%%%%%%%%%%%%%%%%%%%%%
+
+\begin{document}
+
+\begin{frontmatter}
+
+\title{Auto-tuned Jacobi-like Multi-grid Smoother\\ for Fast Pressure Projection}
+
+%% Group authors per affiliation:
+\author{Gabriel D Weymouth}
+\address{Engineering and Physical Sciences, University of Southampton, Southampton, UK}
+\address{Data-Centric Engineering, Alan Turing Institute, London, UK}
+\ead[url]{https://weymouth.github.io/}
+
+\begin{abstract}
+Pressure projection is the single most computationally expensive step in an unsteady incompressible fluid simulation. This work discusses the potential of data-driven methods to accelerate the approximate solution of the Poisson equation at the heart of pressure projection, linking Multigrid methods to Convolutional Neural Networks. Required to maintain linearity in pressure, the best option for data-driven acceleration is in the preconditioning and smoothing stages. Using automatic differentiation, a high-speed parameterized smoother is developed which outperforms classic smoothing methods by 66-200\% on eleven 2D and 3D benchmarks. The tuned parameters are found to transfer nearly 100\% effectiveness as the resolution is increased, providing a robust approach for accelerated pressure projection of any flow.
+\end{abstract}
+
+\begin{keyword}
+pressure projection, linear algebra, data-driven
+\end{keyword}
+
+\end{frontmatter}
+
+\section{Introduction}
+
+Geometric Multigrid methods are among the fastest approach for the solution of variable coefficient discrete pressure Poisson equations posed on structured computational grids. 
+
+\section{Approach}
+
+\section{Results}
+
+\section{Conclusions}
+
+\section*{References}
+
+\bibliography{mybibfile}
+
+\end{document}
