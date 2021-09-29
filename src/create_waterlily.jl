@@ -76,7 +76,7 @@ function shark(p=6;k=5.3,A=0.1,St=0.3,Re=1e4,U=1,
 end	
 
 using DataStructures
-function make_data(;len=100,Δt=0.1,cases=[circle,TGV,donut,wing,shark],p=6,kw...)
+function create_waterlily(;len=100,Δt=0.1,cases=[circle,TGV,donut,wing,shark],p=6,kw...)
     data = OrderedDict()
     for case ∈ cases
         @show case

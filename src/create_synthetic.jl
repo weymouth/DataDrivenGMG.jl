@@ -48,13 +48,13 @@ end
 circle(;kw...) = sphere(;N=2,kw...)
 
 using DataStructures
-function make_data(;len=100,kw...)
+function create_synthetic(;len=100,kw...)
     OrderedDict(
-        "2D-box"=>[static(N=2;kw...) for i ∈ 1:len],
-        "3D-box"=>[static(N=3;kw...) for i ∈ 1:len],
-        "2D-μ"  =>[dipole(N=2;kw...) for i ∈ 1:len],
-        "3D-μ"  =>[dipole(N=3;kw...) for i ∈ 1:len],
-        "circle"=>[circle(;kw...) for i ∈ 1:len],
-        "sphere"=>[sphere(;kw...) for i ∈ 1:len]
+        "2D-static"=>[static(N=2;kw...) for i ∈ 1:len],
+        "3D-static"=>[static(N=3;kw...) for i ∈ 1:len],
+        "2D-dipole"=>[dipole(N=2;kw...) for i ∈ 1:len],
+        "3D-dipole"=>[dipole(N=3;kw...) for i ∈ 1:len],
+        "2D-sphere"=>[circle(;kw...) for i ∈ 1:len],
+        "3D-sphere"=>[sphere(;kw...) for i ∈ 1:len]
     )
 end

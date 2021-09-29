@@ -3,8 +3,8 @@ import GeometricMultigrid: GS!,pseudo!,SOR!
 
 # Generate WaterLily simulation data
 begin # this block takes a few minutes...
-    include("data_waterlily.jl")
-    data = make_data()
+    include("create_waterlily.jl")
+    data = create_waterlily(;len=1,p=4)
 end
 
 # Set up a custom mg_state
@@ -41,9 +41,7 @@ end
 
 # Define smoother options and get loss across smoothers
 begin
-    Jacobi!(st;inner=2,kw...) = for _ ∈ 1:inner
-        GS!(st;inner=0,kw...)
-    end
+    Jacobi!(st;kw...) = GS!(st;inner=0,kw...)
     smoothers = [Jacobi!,GS!,pseudo!]
 end
 compareloss = [loss(d;smooth!) for smooth! ∈ smoothers, (_,d) ∈ data]
@@ -56,10 +54,11 @@ end
 
 begin
     using StatsPlots,CategoricalArrays
-    sizes = ["Jacobi","Gauss-Sidel","Ã⁻¹ transfer"]
-    ctg = CategoricalArray(repeat(sizes,inner=5))
-    levels!(ctg,sizes)
-    groupedbar(compareloss', group = ctg, legend=:bottomright,
+    cats = ["Jacobi","Gauss-Sidel","Ã⁻¹ transfer"]
+    ctg = CategoricalArray(repeat(cats,inner=length(data)))
+    levels!(ctg,cats)
+    groupedbar(compareloss', group = ctg, 
+                legend=:bottomright, size = (400,400),
                 yaxis=("log₁₀ residual reduction",:flip),
                 xaxis=("cases",(1:length(data),keys(data))))
 end
@@ -100,10 +99,10 @@ end
 # plot loss across examples and scales
 begin
     using StatsPlots,CategoricalArrays
-    sizes = ["transfer","⅛","¼","½","1"]
-    ctg = CategoricalArray(repeat(sizes,inner=5))
-    levels!(ctg,sizes)
-    groupedbar([compareloss[end,:] scaleloss'], 
+    cats = ["transfer","⅛","¼","½","1"]
+    ctg = CategoricalArray(repeat(cats,inner=length(data)))
+    levels!(ctg,cats)
+    groupedbar([compareloss[end,:] scaleloss'], size = (400,400),
                 group=ctg, legend=:bottomright, palette=:Greens_5,
                 yaxis=("log₁₀ residual reduction",:flip),
                 xaxis=("cases",(1:length(data),keys(data))),)
@@ -115,8 +114,8 @@ begin
     using Plots
     models=p->(D->1+p[1]+D*(p[2]+D*p[3]),L->L*(p[4]+L*p[5]))
     a,_ = models(p₀)
-    plot(-6:0.1:0,a,label="transfer",
-         xaxis=("Diag(A)"),yaxis=("Diag(psuedo)"),legend=:bottomleft)
+    plot(-6:0.1:0,a,label="transfer",size=(400,400),
+         xaxis=("aᵢᵢ"),yaxis=("fᵢᵢ"),legend=:bottomleft)
     for (name,p) in opt
         x = name ∈ (TGV,donut) ? (-6:0.1:0) : (-4:0.1:0)
         a,_ = models(p)
@@ -127,8 +126,8 @@ begin
 
     x = 0:0.02:1
     _,a = models(p₀)
-    plot(x,a,label="transfer",
-         xaxis=("Lower(A)"),yaxis=("Lower(psuedo)"),legend=:topleft)
+    plot(x,a,label="transfer",size=(400,400),
+         xaxis=("aᵢⱼ"),yaxis=("fᵢⱼ"),legend=:bottomright)
     for (name,p) in opt
         _,a = models(p)
         plot!(x,a,label=name)
@@ -176,11 +175,12 @@ crosscount=[ 6.35661  6.3778   6.35661  11.5915   13.4125
 
 begin
     using StatsPlots,CategoricalArrays
-    sizes = ["Gauss-Sidel","SOR","Ã⁻¹ transfer","Ã⁻¹ tuned-¼"]
-    colors = repeat([palette(:default)[2],palette(:default)[4],:lightgreen,palette(:default)[3]],inner=5)
-    ctg = CategoricalArray(repeat(sizes,inner=5))
-    levels!(ctg,sizes)
-    groupedbar(crosscount',
+    n = length(data)
+    cats = ["Gauss-Sidel","SOR","Ã⁻¹ transfer","Ã⁻¹ tuned-¼"]
+    colors = repeat([palette(:default)[2],palette(:default)[4],:lightgreen,palette(:default)[3]],inner=n)
+    ctg = CategoricalArray(repeat(cats,inner=n))
+    levels!(ctg,cats)
+    groupedbar(crosscount',size=(400,400),
                 group=ctg, legend=:bottomright,c=colors,
                 yaxis=("relative time"),
                 xaxis=("cases",(1:length(data),keys(data))),)
