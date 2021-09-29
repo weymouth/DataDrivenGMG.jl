@@ -25,7 +25,7 @@
 \ead[url]{https://weymouth.github.io/}
 
 \begin{abstract}
-Pressure projection is the single most computationally expensive step in an unsteady incompressible fluid simulation. This work discusses the potential of data-driven methods to accelerate the approximate solution of the Poisson equation at the heart of pressure projection, linking Multigrid methods to Convolutional Neural Networks. Required to maintain linearity in pressure, the best option for data-driven acceleration is in the preconditioning and smoothing stages. Using automatic differentiation, a high-speed parameterized smoother is developed which outperforms classic smoothing methods by 66-200\% on eleven 2D and 3D benchmarks. The tuned parameters are found to transfer nearly 100\% effectiveness as the resolution is increased, providing a robust approach for accelerated pressure projection of any flow.
+Pressure projection is the single most computationally expensive step in an unsteady incompressible fluid simulation. This work discusses the potential of data-driven methods to accelerate the approximate solution of the Poisson equation at the heart of pressure projection, linking Multigrid methods to Convolutional Neural Networks. Required to maintain linearity in pressure, the best option for data-driven acceleration is in the smoothing step. Using automatic differentiation, a high-speed parameterized smoother is developed which outperforms classic Multi-grid methods by 66-200\% on eleven 2D and 3D benchmarks. The tuned parameters are found to transfer nearly 100\% effectiveness as the resolution is increased, providing a robust approach for accelerated pressure projection of any flow.
 \end{abstract}
 
 \begin{keyword}
@@ -38,9 +38,9 @@ pressure projection, linear algebra, data-driven
 
 Pressure projection is a bottleneck in high-speed unsteady incompressible flow solvers. The pressure projection step typically makes up 25-50\% of the solution cost even in serial simulations, and the proportional cost grows in massively parallel simulations as the elliptic pressure Poisson equation requires communication throughout the computational domain instead of being confined to a local characteristic. Methods such as artificial-compressibility, smooth-particle-hydrodynamics, and particle-in-cell attempt to side-step this computational cost by modelling or otherwise under-resolving the pressure evolution compared to the fluid's momentum. However, these approaches lead to significant errors in pressure forces, thereby making them unsuitable for many applications or requiring explicit pressure corrections.
 
-Recent advances in data-driven acceleration of flow solvers have mainly focused on data-assimilation methods and data-driven turbulence closures. Data-assimilation methods typically avoid the expensive pressure projection step entirely, focusing on applications where time-accurate pressure forces are not important. Data-driven closures for Large Eddy Simulation (LES) and Unsteady Reynolds Averaged Navier-Stokes (unRANS) and even Spanwise Averaged Navier-Stokes (SANS) simulations have seen growing success and are capable of accurate force prediction. Convolutional Neural Networks (CNN) are among the best data-driven methods for classification and regression of 2D images and 3D fields, having been applied in fluid dynamics for turbulence closures as well as other applications such as super-resolution prediction and generative models. CNN architectures have inherent translational symmetry and often use a restriction phase, where the size of the network is reduced before expanding again, both of which help with generalization to unseen cases. 
+Recent advances in data-driven acceleration of flow solvers have mainly focused on data-assimilation methods and data-driven turbulence closures. Data-assimilation methods typically avoid the expensive pressure projection step entirely, focusing on applications where time-accurate pressure forces are not important. Data-driven closures for Large Eddy Simulation (LES) and Unsteady Reynolds Averaged Navier-Stokes (unRANS) and even Spanwise Averaged Navier-Stokes (SANS) simulations have seen growing success and are capable of accurate force prediction. Deep learning Convolutional Neural Networks (CNN) have enabled many of these turbulence closures as well as other fluids applications such as super-resolution and generative models. CNN architectures have inherent translational symmetry and often use a restriction phase, where the size of the network is reduced before expanding again, both of which help generalize the trained networks to unseen prediction cases. 
 
-However, the pressure projection in these all of these studies have not been augmented, leaving their acceleration as an nearly untouched topic. Some recent work has focused on the pressure projection step explicitly. Chaotic projection methods for massively parallel systems; not data driven. Multi-grid data-driven decomposition; high errors and unclear speed-up. This work links develops a high-speed parameterized smoother which outperforms classic smoothing methods on eleven 2D and 3D benchmarks. Moreover, as the approach in linear in the pressure and scale-invariant, the parameters can be tuned on a coarse simulation and maintain their accelerated performance on the fine simulation. 
+However, the pressure projection in these all of these studies have not been augmented, leaving their acceleration as a nearly untouched topic. Some recent work has focused on the pressure projection step explicitly. Chaotic projection methods for massively parallel systems; not data driven. Multi-grid data-driven decomposition; high errors and unclear speed-up. This work links develops a high-speed parameterized smoother which outperforms classic smoothing methods on eleven 2D and 3D benchmarks. Moreover, as the approach in linear in the pressure and scale-invariant, the parameters can be tuned on a coarse simulation and maintain their accelerated performance on the fine simulation. 
 
 \section{Linear System Description}
 
@@ -48,7 +48,7 @@ The discrete Poisson equation at the heart of the projection step is defined as
 \begin{equation}\label{eq:axb}
     A x = b
 \end{equation}
-where $x$ is the desired pressure field vector, $b$ is the source term (proportional to the divergence of the velocity field to be projected), and $A$ is the Poisson matrix. For conservative Poisson equations, $A$ is symmetric, has zero-sum rows and columns, is negative semi-definite, and has a single zero eigenvalue. The matrix is also extremely sparse. Using a second-order scheme on structured grids in $M$ dimensions, $A$ has only $M$ non-zero sub-diagonals. While the solution vector size $N$ may easily be larger than $10^6$, this means matrix-vector multiplication $Ax$ has computational cost $O(NM)=O(N)$ instead of $O(N^2)$.
+where $x$ is the desired pressure field vector, $b$ is the source term (proportional to the divergence of the velocity field to be projected), and $A$ is the Poisson matrix. For conservative Poisson equations, $A$ is symmetric, has zero-sum rows and columns, is negative semi-definite, and has a single zero eigenvalue. The matrix is also extremely sparse. Using a second-order scheme on structured grids in $M$ dimensions, $A$ has only $M$ non-zero sub-diagonals. While the solution vector size $N$ may easily be larger than $10^6$, the matrix-vector multiplication $Ax$ only has computational cost $O(NM)=O(N)$ instead of $O(N^2)$.
 
 Iterative methods solve equation \ref{eq:axb} by updating an approximate solution $x^k$ to a new solution $x^{k+1}$ with reduced error. As the problem is linear, the equation for the update $\epsilon$ is simply
 \begin{equation}
@@ -60,7 +60,7 @@ where $r$ is the residual. In practise, only an approximate solution for $\epsil
 \end{equation}
 This process is iterated until the residual is reduced sufficiently, the required tolerance level being highly dependant on the application.
 
-Multi-grid (MG) methods are among the fastest iterative solution approaches for variable coefficient discrete pressure Poisson equations. The MG operator is effectively a \textit{linear} CNN architecture where the system is preconditioned before the residual is restricted down to a reduced-size problem and the correction is prolongated back up. 
+Multi-grid (MG) methods are among the fastest iterative solution approaches for variable coefficient discrete pressure Poisson equations. The MG operator is effectively a \textit{linear} convolutional architecture where the system is preconditioned before the residual is restricted down to a reduced-size problem and the correction is prolongated back up. 
 % \begin{equation}
 %     r_c = R r \quad\rightarrow\quad A_c \epsilon_c = r_c \quad\rightarrow\quad \epsilon = P \epsilon_c
 % \end{equation}
@@ -71,24 +71,32 @@ The restriction-solve-prolongation process, a V-cycle, distributes the residual 
 
 As \textit{any} element of the residual of the elliptic system potentially influences \textit{every} element of the update, $O(N\log N)$ is the best possible solution time scaling. However, data-driven methods can still be used to accelerate pressure projection methods by speeding-up and increasing the residual reduction of each V-cycle iteration.
 
-The linearity of the system is another critical property, but this linearity needs only be maintained with respect to the update and residual fields. The coefficients of the ``MG network'' can all potentially be optimized for a specific sub-class of problems, and they can be made nonlinear functions of $A$. However, neither the restriction or prolongation operations are functions of $A$, and it not clear how this information could be integrated without slowing down the V-cycle. Similarly, a simple Jacobi preconditioner
+The linearity of the system is a critical property which the data-driven method must maintain, but this linearity is only with respect to the update and residual fields. The coefficients of the ``MG network'' can all potentially be optimized for a specific sub-class of problems, and they can be made nonlinear functions of $A$. However, neither the restriction or prolongation operations are functions of $A$, and a workable method of including the dependence is unclear.\footnote{For example, the residual restriction could use $a_{ij}$ to define a non-uniform weight function $w_{ij} = r_i/r_j$, but since the matrix is symmetric the same weight should apply to $r_j/r_i$, resulting in a uniform pooling.} Similarly, a simple Jacobi preconditioner
 \begin{equation}
     \epsilon = D^{-1}r
 \end{equation}
-where $D$ is the diagonal of $A$, is as fast as possible and is sufficient for the V-cycle to distribute the residual throughout the domain. This leaves the smoother as the best candidate for acceleration.
+where $D$ is the diagonal of $A$, is as fast as possible and is sufficient for the V-cycle to distribute the residual throughout the domain. Therefore, for the remainder of the paper we will focus on the smoother as the best candidate for acceleration, using a simple Jacobi preconditioner and uniform pooling/distribution for restriction/prolongation.
 
-While more complex options are certainly possible, this work uses a simple parameterized Jacobi-like smoother as
+While more complex options are certainly possible, this work uses a simple parameterized Jacobi-like smoother
 \begin{equation}
     \epsilon = \tilde A^{-1}r
 \end{equation}
-where $\tilde A^{-1}=f(A|\theta)$ is an approximate matrix-inverse with the same sparsity as $A$ and $\theta$ are the parameters. Unlike Gauss-Sidel or SOR, the matrix-vector multiplication smoother requires no back-propagation and so can be implemented as a vector-operation in serial or parallel simulations, offering a significant potential speed-up.
+where $\tilde A^{-1}=f(A\,|\theta)$ is an approximate matrix-inverse with the same sparsity as $A$ and parameter vector $\theta$. 
+%The matrix $A$ is constant during the projection step (and often for an entire simulation), meaning $\tilde A^{-1}$ can be computed and stored ahead of time.
+Unlike Gauss-Sidel or SOR smoothers, the matrix-vector multiplication smoother requires no back-propagation and so can be vectorized in serial or parallel implementations, offering a significant potential speed-up.
 
-There are few constraints on $\tilde A^{-1}$; it must have units of $A^{-1}$, and symmetry of $A$ implies the approximate inverse should also be symmetric. For simplicity, the diagonal and off-diagonal coefficients of $\tilde A^{-1}$ are constructed separately
+There are few constraints on $\tilde A^{-1}$: it must have units of $A^{-1}$, and symmetry of $A$ implies the approximate inverse should also be symmetric. For simplicity, the diagonal and off-diagonal coefficients of $\tilde A^{-1}$ are all constructed independently
 \begin{equation}
-    \tilde a^{-1}_{ii} = \frac{f_D(a_{ii}/s|\theta_D)}{a_{ii}} , \quad
-    \tilde a^{-1}_{ij} = \frac{f_L(a_{ij}/s|\theta_L)}{a_{ii}}
+    \tilde a^{-1}_{ii} = \frac{f_D(a_{ii}/s\,|\theta_D)}{a_{ii}} , \quad
+    \tilde a^{-1}_{ij} = \frac{f_L(a_{ij}/s\,|\theta_L)}{a_{ii}+a_{jj}}
 \end{equation}
-where diagonal-scaling is used externally, and the function inputs are scaled by $s=\max(a_{ij})$. Note a Jacobi smoother would use $f_D=1$ and $f_L=0$. T
+where function inputs are scaled by the maximum off-diagonal $s=\max(A-D)$ and the outputs are scaled by the diagonal elements. Note a Jacobi smoother would use $f_D=1$ and $f_L=0$. 
+
+Automatic differentiation (AD) is used to optimize the parameterized smoother for a set of training data $X=\{A,x^k,b\}$. The loss function is simply the reduction in the norm of the residual after a V-cycle iteration $L = \log_{10}(|r^{k+1}| / |r^{k}|)$, which means that example pressure \textit{solutions} are not required. This loss is averaged over each iteration and each example in the data-set. The optimal parameters are defined as
+\begin{equation}
+    \hat\theta = \min_\theta L(\theta\, |X)
+\end{equation}
+and determined using Newton's method. The ForwardDiff.jl AD package is used determine the gradient $\nabla_\theta L$ and Hessian $H_{\theta\theta} L$ automatically. The adaptive and recursive nature of the MG V-cycle and general nonlinear form of $f$ would make analytic derivatives prohibitively unwieldy and error prone, and numerical finite differences potentially unstable and inaccurate.
 
 \begin{figure}
     \centering
@@ -120,13 +128,16 @@ where diagonal-scaling is used externally, and the function inputs are scaled by
         \caption{Solver time}
         \label{fig:synthetic time}
     \end{subfigure}
-    \caption{(a-c) Sample solutions from the data-sets of three of the six synthetic cases. (d) Residual reduction over a single Multi-grid V-cycle on the `test' cases after tuning using the `train' case. Training case `union` refers to the smoother trained on all of the synthetic cases. (b) Time to reduce pressure residual by $10^{-3}$ for classical and parameterized smoothers on each synthetic case. Time is relative to the time of a single V-cycle using the Jacobi smoother.}
+    \caption{(a-c) Sample solutions from the data-sets of three of the six synthetic cases. (d) Residual reduction over a single Multi-grid V-cycle on the `test' cases after tuning using the `train' case. Training case `union' refers to the smoother trained on all of the synthetic cases. (b) Time to reduce pressure residual by $10^{-3}$ for classical and parameterized smoothers on each synthetic case. Time is relative to the time of a single V-cycle using the Jacobi smoother.}
     \label{fig:synthetic cases}
 \end{figure}
 
+\section{Synthetic Projection Systems and Results}
 
+A set of six synthetic projection cases were constructed to establish the characteristics of the parameterized smoother. The three 2D cases are show in Figure~\ref{fig:2D-box}-\ref{fig:2D-sphere}, and each has a matching 3D case. The `box' cases have a simple constant gradient solution throughout the domain, with the direction and magnitude randomized. The dipole `$\mu$' cases have a localized dipole within a quiescent flow with randomized placement, direction and magnitude. The `sphere' cases have a moving sphere immersed within a quiescent flow with randomized radius, location, and velocity direction. Neumann boundary conditions are applied on all boundaries, including the immersed sphere, through adjustment of the $A$ matrix coefficients which are otherwise uniform. All cases are initialized with $x^0=0$, and all cases feature initially localized residuals; i.e. $r^0\ne0$ only in a fraction of the cells, but $x$ must be updated throughout the domain, starkly illustrating the elliptic nature of the projection step. 
 
-\section{Results}
+Figure~\ref{fig:cross plot} shows the `test' performance of the parameterized smoother over a single V-cycle on 100 randomized examples after optimization using 100 examples of the `test' case. Each example uses a grid size of n=32 point in each direction ($N=32^2$ in 2D and $N=32^3$ in 3D) as testing with other resolutions found essentially no change in the performance. As expected, the performance is best when testing and training on the same case, with the residual reduced by $10^{-1.18}$ on the 2D-sphere case down to $10^{-1.75}$ on the 2D-box case. The performance for the simplest `box' and 2D-$\mu$ cases generalizes poorly, with some cases diverging instead converging, but the optimized 2D-sphere smoother generalizes essentially as well as the `union' smoother trained on all of the data. 
+%The performance of the `union' smoother is only 1-4\% lower than the smoother trained on the test case for the dipole and sphere cases.
 
 \begin{figure}
     \centering
@@ -167,6 +178,8 @@ where diagonal-scaling is used externally, and the function inputs are scaled by
     \caption{(a-e) Snapshots from the five flow simulation cases. The Taylor-Green Vortex and torus flow are 3D cases, and the flapping wing and swimming shark have dynamic geometries. (f) Residual reduction over a single Multi-grid V-cycle for classical and parameterized smoothers on each case. The `transfer' smoother has been trained on the union of the synthetic data sets from Figure~\ref{fig:synthetic cases}.}
     \label{fig:simulation cases}
 \end{figure}
+
+\section{Unsteady Incompressible Simulation Results}
 
 \begin{figure}
     \centering
