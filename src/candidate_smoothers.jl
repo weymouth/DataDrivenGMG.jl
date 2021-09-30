@@ -1,12 +1,63 @@
 using GeometricMultigrid
-using GeometricMultigrid: GS!,pseudo!,multL,multU,increment!
-Jacobi!(st;kw...) = GS!(st,inner=0)
-@fastmath function SOR!(st;inner=2,ω=0.9,kw...)
-    @loop st.ϵ[I] = ω*st.r[I]*st.iD[I]
-    for _ ∈ 1:inner
-        @loop st.ϵ[I] = (1-ω)*st.ϵ[I]+ω*st.iD[I]*(st.r[I]-multL(I,st.A.L,st.ϵ)-multU(I,st.A.L,st.ϵ))
+using GeometricMultigrid: multL, multU, mult, increment!, δ
+
+# Classical smoothers
+@fastmath function GS!(st;inner=2,kw...) # copied from GeometricMultigrid
+    @loop st.ϵ[I] = st.r[I]*st.iD[I]
+    @inbounds for _ ∈ 1:inner, I ∈ st.iD.R
+        st.ϵ[I] = st.iD[I]*(st.r[I]-multL(I,st.A.L,st.ϵ)-multU(I,st.A.L,st.ϵ))
     end
     increment!(st;kw...)
+end
+@fastmath function SOR!(st;inner=2,ω=1.05,kw...)
+    @loop st.ϵ[I] = ω*st.r[I]*st.iD[I]
+    @inbounds for _ ∈ 1:inner, I ∈ st.iD.R
+       st.ϵ[I] = (1-ω)*st.ϵ[I]+ω*st.iD[I]*(st.r[I]-multL(I,st.A.L,st.ϵ)-multU(I,st.A.L,st.ϵ))
+    end
+    increment!(st;kw...)
+end
+Jacobi!(st;kw...) = GS!(st,inner=0)
+
+# Parameterized approximate inverse matrix P
+function PseudoInv(A::FieldMatrix; scale=maximum(A.L),
+    p::AbstractVector{T}=Float32[-0.1449,-0.0162,0.00734,0.3635,-0.2018],
+    models=p->(D->1+p[1]+D*(p[2]+D*p[3]),L->L*(p[4]+L*p[5]))) where T
+
+    L,D,N = zeros(T,size(A.L)),zeros(T,size(A.D)),size(A.L)[end]
+    Dm,Lm = models(p)
+    for I ∈ A.R
+        invD = (abs(A.D[I])<1e-8) ? 0. : 1.0/A.D[I]
+        D[I] = invD*Dm(A.D[I]/scale)
+        for i ∈ 1:N
+            J = I#-δ(i,N)
+            invD = (abs(A.D[I]+A.D[J])<2e-8) ? 0. : 2.0/(A.D[I]+A.D[J])
+            L[I,i] = invD*Lm(A.L[I,i]/scale)
+        end
+    end
+    FieldMatrix(L,D,A.R)
+end
+
+# Create MG state with st.P
+fill_pseudo!(st;kw...) = fill_pseudo!(st,st.child;kw...)
+fill_pseudo!(st,child;kw...) = (fill_pseudo!(st,nothing;kw...);fill_pseudo!(child;kw...))
+fill_pseudo!(st,::Nothing;kw...) = st.P=PseudoInv(st.A;kw...)
+
+p₀ = Float32[-0.1449,-0.0162,0.00734,0.3635,-0.2018] # result from tune_synthetic
+function state(A,x,b;p=p₀,xT::Type=eltype(p),kw...)
+    y = zero(x,xT)     # make FieldVector of type xT
+    @loop y[I] = x[I]  # copy values
+    st = mg_state(A,y,b)
+    fill_pseudo!(st;p,kw...)
+    st
+end
+state(A,b;kw...) = state(A,zero(b),b;kw...)
+
+# Apply smoother
+pseudo!(st;kw...) = pseudo!(st,st.P;kw...)
+pseudo!(st,nothing;kw...) = nothing # Can't use pseudo! without st.P
+@fastmath pseudo!(st,P::FieldMatrix;inner=2,kw...) = for _=1:inner
+    @loop st.ϵ[I] = mult(I,P.L,P.D,st.r)
+    increment!(st)
 end
 
 # # uniform 5-point stencil: loss ≈ -0.7, @btime(n=32)≈3.1μs

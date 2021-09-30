@@ -1,20 +1,22 @@
-using WaterLily
+import WaterLily
+using WaterLily: AutoBody, Simulation
+using GeometricMultigrid: Poisson,FieldVector
 using LinearAlgebra: norm2
 
-function poisson_setup!(a::Flow)
+function poisson_setup!(a)
     a.u⁰ .= a.u; a.u .= 0
     WaterLily.conv_diff!(a.f,a.u⁰,ν=a.ν)
     WaterLily.BDIM!(a); WaterLily.BC!(a.u,a.U)
-    @inside a.σ[I] = (WaterLily.div(I,a.u)+a.σᵥ[I])/a.Δt[end]
+    WaterLily.@inside a.σ[I] = (WaterLily.div(I,a.u)+a.σᵥ[I])/a.Δt[end]
     a.u .= a.u⁰ # roll-back!
 end
 
 function sim_collect_poisson!(sim;Δt=0.1,remeasure)
     a = sim.flow # less typing
-    sim_step!(sim,sim_time(sim)+Δt;remeasure)  # ∫ over dt & get new a.p
-    measure!(a,sim.body;t=sim.L/sim.U*sim_time(sim)) # get new a.μ₀
+    WaterLily.sim_step!(sim,WaterLily.sim_time(sim)+Δt;remeasure)  # ∫ over dt & get new a.p
+    WaterLily.measure!(a,sim.body;t=sim.L/sim.U*WaterLily.sim_time(sim)) # get new a.μ₀
     poisson_setup!(a)                            # get new a.σ
-    return copy(a.p),copy(a.μ₀),copy(a.σ)
+    return Poisson(copy(a.μ₀)),FieldVector(copy(a.p)),FieldVector(copy(a.σ))
 end
 
 function circle(p=6;Re=250,n=16,m=8,T=Float64)
@@ -46,7 +48,7 @@ function donut(p=6;Re=1e3,T=Float64)
     Simulation((2n+2,n+2,n+2),[1.,0.,0.],R;ν,body,T)
 end
 
-using StaticArrays
+using StaticArrays: SVector, @SMatrix
 function wing(p=6;Re=250,U=1,amp=π/4,ϵ=1,thk=2ϵ+√2,T=Float64)
     L = 2^(p-1)
     sdf(x,t) = norm2(x .- SVector(0.,clamp(x[2],-L/2,L/2)))-thk/2

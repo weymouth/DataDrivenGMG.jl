@@ -11,7 +11,7 @@ function static(;n=32,N=2,T::Type=Float32,m=rand(T,N))
             I.I[i] !=2 && (L[I,i] = 1)
         end
     end
-    A,x = Poisson(L),FieldVec(x)
+    A,x = Poisson(L),FieldVector(x)
     A,A*x
 end
 
@@ -27,7 +27,7 @@ function dipole(;n=32,N=2,T::Type=Float32,x0=rand(T,N),m=rand(T,N),s=rand(),Δt=
         end
     end
     b .-= sum(b)/n^N
-    Poisson(L),FieldVec(b)
+    Poisson(L),FieldVector(b)
 end
 
 @fastmath kern₀(d) = 0.5+0.5d+0.5sin(π*d)/π
@@ -43,9 +43,8 @@ function sphere(;n=32,N=3,T::Type=Float32,x0=rand(T,N),m=rand(T,N),s=rand(),Δt=
         I.I[i] !=2 && (L[I,i] = Δt*μm)
         b[I] += Δt*m[i]*(μp-μm)
     end
-    Poisson(L),FieldVec(b)
+    Poisson(L),FieldVector(b)
 end
-circle(;kw...) = sphere(;N=2,kw...)
 
 using DataStructures
 function create_synthetic(;len=100,kw...)
@@ -54,7 +53,7 @@ function create_synthetic(;len=100,kw...)
         "3D-static"=>[static(N=3;kw...) for i ∈ 1:len],
         "2D-dipole"=>[dipole(N=2;kw...) for i ∈ 1:len],
         "3D-dipole"=>[dipole(N=3;kw...) for i ∈ 1:len],
-        "2D-sphere"=>[circle(;kw...) for i ∈ 1:len],
-        "3D-sphere"=>[sphere(;kw...) for i ∈ 1:len]
+        "2D-sphere"=>[sphere(N=2;kw...) for i ∈ 1:len],
+        "3D-sphere"=>[sphere(N=3;kw...) for i ∈ 1:len]
     )
 end
