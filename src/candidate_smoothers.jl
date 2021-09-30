@@ -23,13 +23,13 @@ function PseudoInv(A::FieldMatrix; scale=maximum(A.L),
     p::AbstractVector{T}=Float32[-0.1449,-0.0162,0.00734,0.3635,-0.2018],
     models=p->(D->1+p[1]+D*(p[2]+D*p[3]),L->L*(p[4]+L*p[5]))) where T
 
-    L,D,N = zeros(T,size(A.L)),zeros(T,size(A.D)),size(A.L)[end]
+    L,D,N = zeros(T,size(A.L)),zeros(T,size(A.D)),length(size(A.D))
     Dm,Lm = models(p)
     for I ∈ A.R
         invD = (abs(A.D[I])<1e-8) ? 0. : 1.0/A.D[I]
         D[I] = invD*Dm(A.D[I]/scale)
         for i ∈ 1:N
-            J = I#-δ(i,N)
+            J = I-δ(i,N)
             invD = (abs(A.D[I]+A.D[J])<2e-8) ? 0. : 2.0/(A.D[I]+A.D[J])
             L[I,i] = invD*Lm(A.L[I,i]/scale)
         end

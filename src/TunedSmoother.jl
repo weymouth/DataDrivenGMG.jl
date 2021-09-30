@@ -9,4 +9,7 @@ export create_synthetic
 include("create_waterlily.jl")
 export create_waterlily
 
+include("metrics.jl")
+export avecount,loss,fit
+
 end # module

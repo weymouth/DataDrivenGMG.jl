@@ -11,10 +11,6 @@ end
 results = run(suite)
 time_factor = [minimum(results[s]).time/minimum(results[Jacobi!]).time for s ∈ smoothers[2:end]]
 
-begin
-    itcount(d,s;kw...) = mg!(state(d...);reltol=1e-3,smooth! = s, mxiter=32, kw...)
-    avecount(data,s;kw...) = sum(itcount(d,s;kw...) for d ∈ data)/length(data)
-end
 data = create_synthetic(;n=64)
 counts = [avecount(d,s) for s in smoothers[2:end], (name,d) ∈ data]
 
