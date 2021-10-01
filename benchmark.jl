@@ -1,4 +1,4 @@
-using BenchmarkTools, Plots, GeometricMultigrid, TunedSmoother
+using BenchmarkTools, Plots, TunedSmoother
 
 begin
     smoothers = [Jacobi!,GS!,SOR!,pseudo!]

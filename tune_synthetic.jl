@@ -65,3 +65,13 @@ savefig("crossloss.png")
 #     i+2>length(y) && return y[end]
 #     y[i+2]*dx+y[i+1]*(1-dx)
 # end
+
+using GeometricMultigrid: mg, @loop
+data = create_synthetic(len=1)
+for name in ["2D-static", "2D-dipole", "2D-sphere"]
+    A,b = data[name][1]
+    x,hist = mg(A,b)
+    name == "2D-sphere" && (@loop x[I] *= -4*A.D[I])
+    heatmap(x.data[x.R],size = (250,250),legend=false,axis=nothing)
+    savefig(name*".png")
+end

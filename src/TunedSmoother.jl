@@ -7,9 +7,9 @@ include("create_synthetic.jl")
 export create_synthetic
 
 include("create_waterlily.jl")
-export create_waterlily
+export create_waterlily,circle,TGV,donut,wing,shark
 
 include("metrics.jl")
-export avecount,loss,fit
+export itcount,avecount,loss,fit,mg!
 
 end # module
