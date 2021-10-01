@@ -53,8 +53,8 @@ using Plots.PlotMeasures
 begin
     lim = maximum(abs.(crossloss))
     names(d) = (1:length(d),keys(d))
-    plot(size=(400,370))
-    display(heatmap!(crossloss',c=:RdBu_9,clims=(-lim,lim),
+    plot(size=(400,350))
+    display(heatmap!(crossloss',c=palette([:green,:white,:red],13),clims=(-lim,lim),
             title="log₁₀ residual reduction",titlefontsize=12,
             xaxis=("train",names(opt),60),yaxis=("test",names(data),:flip)))
 end

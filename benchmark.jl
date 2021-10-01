@@ -14,6 +14,8 @@ time_factor = [minimum(results[s]).time/minimum(results[Jacobi!]).time for s ∈
 data = create_synthetic(;n=64)
 counts = [avecount(d,s) for s in smoothers[2:end], (name,d) ∈ data]
 
+jacobicount = [itcount(d[1],Jacobi!,reltol=1) for (name,d) ∈ data]
+
 begin # inner=2
     time_factor = [ 2.397728501892915
                     2.5168063818280153
@@ -21,7 +23,8 @@ begin # inner=2
     counts = [ 3.0  4.0  1.5   1.17  3.88  3.55
                 4.0  3.0  1.55  1.16  3.96  3.0
                 3.0  3.0  1.07  1.14  3.18  3.0]
-    counts.*time_factor
+    rel_time = counts.*time_factor
+    accel = rel_time[1:2,:]./rel_time[3,:]' # speed up!!
 end
 
 begin
