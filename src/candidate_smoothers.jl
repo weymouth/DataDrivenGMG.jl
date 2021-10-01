@@ -42,7 +42,7 @@ fill_pseudo!(st;kw...) = fill_pseudo!(st,st.child;kw...)
 fill_pseudo!(st,child;kw...) = (fill_pseudo!(st,nothing;kw...);fill_pseudo!(child;kw...))
 fill_pseudo!(st,::Nothing;kw...) = st.P=PseudoInv(st.A;kw...)
 
-p₀ = Float32[-0.1449,-0.0162,0.00734,0.3635,-0.2018] # result from tune_synthetic
+p₀ = Float32[-0.100887, -0.00164709, 0.00833292, 0.418425, -0.260235] # result from tune_synthetic
 function state(A,x,b;p=p₀,xT::Type=eltype(p),kw...)
     y = zero(x,xT)     # make FieldVector of type xT
     @loop y[I] = x[I]  # copy values
