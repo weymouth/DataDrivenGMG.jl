@@ -16,7 +16,7 @@
 
 \begin{frontmatter}
 
-\title{Auto-tuned Jacobi-like Multi-grid Smoother\\ for Fast Pressure Projection}
+\title{Auto-tuned Multi-grid Solver for Accelerated \\ Pressure Projection}
 
 %% Group authors per affiliation:
 \author{Gabriel D Weymouth}
@@ -25,7 +25,7 @@
 \ead[url]{https://weymouth.github.io/}
 
 \begin{abstract}
-Pressure projection is the single most computationally expensive step in an unsteady incompressible fluid simulation. This work discusses the potential of data-driven methods to accelerate the approximate solution of the Poisson equation at the heart of pressure projection, linking Multigrid methods to Convolutional Neural Networks. Required to maintain linearity in pressure, the best option for data-driven acceleration is in the smoothing step. Using automatic differentiation, a high-speed parameterized smoother is developed which outperforms classic Multi-grid methods by 66-200\% on eleven 2D and 3D benchmarks. The tuned parameters are found to transfer nearly 100\% effectiveness as the resolution is increased, providing a robust approach for accelerated pressure projection of any flow.
+Pressure projection is the single most computationally expensive step in an unsteady incompressible fluid simulation. This work discusses the potential of data-driven methods to accelerate the approximate solution of the Poisson equation at the heart of pressure projection, linking Multigrid methods to Convolutional Neural Networks. Required to maintain linearity in pressure, the best option for data-driven acceleration is in the smoothing step. Using automatic differentiation, a high-speed parameterized smoother is developed which out-performs classic Multi-grid methods by 66-185\% on eleven 2D and 3D benchmarks. The tuned parameters are found to transfer nearly 100\% effectiveness as the resolution is increased, providing a robust approach for accelerated pressure projection of any flow.
 \end{abstract}
 
 \begin{keyword}
@@ -40,7 +40,7 @@ Pressure projection is a bottleneck in high-speed unsteady incompressible flow s
 
 Recent advances in data-driven acceleration of flow solvers have mainly focused on data-assimilation methods and data-driven turbulence closures. Data-assimilation methods typically avoid the expensive pressure projection step entirely, focusing on applications where time-accurate pressure forces are not important. Data-driven closures for Large Eddy Simulation (LES) and Unsteady Reynolds Averaged Navier-Stokes (unRANS) and even Spanwise Averaged Navier-Stokes (SANS) simulations have seen growing success and are capable of accurate force prediction. Deep learning Convolutional Neural Networks (CNN) have enabled many of these turbulence closures as well as other fluids applications such as super-resolution and generative models. CNN architectures have inherent translational symmetry and often use a restriction phase, where the size of the network is reduced before expanding again, both of which help generalize the trained networks to unseen prediction cases. 
 
-However, none of these studies have applied data-driven techniques to accelerate the critical projection step itself. Some recent work has focused on the pressure projection step explicitly. Chaotic projection methods for massively parallel systems; not data driven. Multi-grid data-driven decomposition; high errors and unclear speed-up. This work develops a high-speed data-driven project method which outperforms classic methods on eleven 2D and 3D benchmarks. Moreover, as the approach in linear in the pressure and scale-invariant, the parameters can be tuned on a coarse simulation and maintain their accelerated performance on unseen fine-grid simulations. 
+However, none of these studies have applied data-driven techniques to accelerate the critical projection step itself. Some recent work has focused on the pressure projection step explicitly. Chaotic projection methods for massively parallel systems; not data driven. Multi-grid data-driven decomposition; high errors and unclear speed-up. This work develops a high-speed data-driven project method which outperforms classic methods on eleven 2D and 3D benchmarks. Moreover, as the approach in linear in the pressure and scale-invariant, the parameters can be tuned on a coarse simulation and maintain their accelerated performance on unseen fine-grid simulations.
 
 \section{Linear System Description}
 
@@ -67,7 +67,7 @@ Multi-grid (MG) methods are among the fastest iterative solution approaches for 
 % where $R$ is the $N_c \times N$ restriction operator, $P$ is the $N \times N_c$ prolongation operator 
 The restriction-solve-prolongation process, a V-cycle, distributes the residual throughout the domain, which enables simple and relatively fast stationary methods such as Gauss-Sidel or Successive Over Relation (SOR) to \textit{smooth} the local high-frequency error in the projected solution. The MG architecture proceeds recursively on the reduced-size problems until a small linear algebra problem is reached which can be approximated with minimal cost. This recursive approach results in only $O(N\log N)$ computational cost.
 
-\section{Data-driven Accelerated Solution Methods}
+\section{Data-driven Accelerated Projection Method}
 
 As \textit{any} element of the residual of the elliptic system potentially influences \textit{every} element of the update, $O(N\log N)$ is the best possible solution time scaling. However, data-driven methods can still be used to accelerate pressure projection methods by speeding-up and increasing the residual reduction of each V-cycle iteration.
 
@@ -80,43 +80,53 @@ Which MG operation is the best candidate for such an approach? The prolongation 
 where $D$ is the diagonal of $A$, is as fast as possible and is sufficient for the V-cycle to distribute the residual throughout the domain. Therefore, for the remainder of the paper we will focus on the smoother as the best candidate for acceleration, using a simple Jacobi preconditioner and uniform pooling/distribution for restriction/prolongation.
 
 While more complex options are certainly possible, this work uses a simple parameterized Jacobi-like smoother
-\begin{equation}
+\begin{equation}\label{eq:smooth}
     \epsilon = \tilde A^{-1}r
 \end{equation}
 where $\tilde A^{-1}=f(A\,|\theta)$ is an approximate matrix-inverse with the same sparsity as $A$ and parameter vector $\theta$. 
 %The matrix $A$ is constant during the projection step (and often for an entire simulation), meaning $\tilde A^{-1}$ can be computed and stored ahead of time.
-Unlike Gauss-Sidel or SOR smoothers, the matrix-vector multiplication smoother requires no back-propagation and so can be vectorized in serial or parallel implementations, offering a significant potential speed-up.
+As with all stationary smoothers, equation \ref{eq:smooth} can be iterated (an inner loop) at each MG level. Unlike Gauss-Sidel or SOR smoothers, the matrix-vector multiplication smoother requires no back-propagation and so can be vectorized in serial or parallel implementations, offering a significant potential speed-up. 
 
 There are few constraints on $\tilde A^{-1}$: it must have units of $A^{-1}$, and symmetry of $A$ implies the approximate inverse should also be symmetric. For simplicity, the diagonal and off-diagonal coefficients of $\tilde A^{-1}$ are constructed independently 
-\begin{equation}
+\begin{equation}\label{eq:approxinv}
     \tilde a^{-1}_{ii} = \frac{f_d(a_{ii}/s\,|\theta_d)}{a_{ii}} , \quad
     \tilde a^{-1}_{ij} = \frac{f_o(a_{ij}/s\,|\theta_o)}{a_{ii}+a_{jj}}
 \end{equation}
 where function inputs are scaled by the maximum off-diagonal $s=\max(A-D)$ and the outputs are scaled by the diagonal elements. Note a Jacobi smoother would use a diagonal function $f_d=1$ and off-diagonal function $f_o=0$. With the learning problem now reduced to two normalized single-variable functions, the specific choice of parameterization is not critical and a simple quadratic polynomial $f(a) = \sum_{p=0}^2 a^p \theta_p$ is chosen for $f_o$ and $f_d$. Using higher-order polynomials, splines, and interpolating kernels did not significantly change the results.
 
-Automatic differentiation (AD) is used to optimize the parameterized smoother for a set of training data $X=\{A,x^k,b\}$. The loss function is simply the reduction in the norm of the residual after a V-cycle iteration $L = \log_{10}(|r^{k+1}| / |r^{k}|)$, which means that example pressure \textit{solutions} are not required. This loss is averaged over each iteration and each example in the data-set. The optimal parameters are defined as
+The parameterized smoother is optimized for a set of training data $X=\{A,x^k,b\}$. The loss function is simply the reduction in the norm of the residual after a V-cycle iteration $L = \log_{10}(|r^{k+1}| / |r^{k}|)$, which means that example pressure \textit{solutions} are not required. This loss is averaged over each iteration and each example in the data-set. The optimal parameters are defined as
 \begin{equation}
     \hat\theta = \min_\theta L(\theta\, |X)
 \end{equation}
-and determined using Newton's method. The ForwardDiff.jl AD package is used determine the gradient $\nabla_\theta L$ and Hessian $H_{\theta\theta} L$ automatically, avoiding inaccurate and potentially unstable finite differences of the nonlinear recursive loss function.
+and determined using Newton's method. Automatic differentiation (AD) is used to determine the gradient $\nabla_\theta L$ and Hessian $H_{\theta\theta} L$, avoiding inaccurate and potentially unstable finite differences of the nonlinear recursive loss function.
+
+The data-driven solver and all the test cases and figures presented in the following sections are implemented in Julia and available for reproduction.
 
 \begin{figure}
     \centering
     \begin{subfigure}[b]{0.3\textwidth}
         \centering
-        \caption{2D-box}
-        \label{fig:2D-box}
+        \includegraphics[width=\textwidth]{figures/2D-static.png}
+        \caption{2D-static}
+        \label{fig:2D-static}
     \end{subfigure}
     \begin{subfigure}[b]{0.3\textwidth}
         \centering
-        \caption{2D-$\mu$}
+        \includegraphics[width=\textwidth]{figures/2D-dipole.png}
+        \caption{2D-dipole}
         \label{fig:2D-mu}
     \end{subfigure}
     \begin{subfigure}[b]{0.3\textwidth}
         \centering
+        \includegraphics[width=\textwidth]{figures/2D-sphere.png}
         \caption{2D-sphere}
         \label{fig:2D-sphere}
     \end{subfigure}
+    \caption{Sample solutions from the data-sets of three of the six synthetic cases.}
+    \label{fig:synthetic cases}
+\end{figure}
+\begin{figure}
+    \centering
     \begin{subfigure}[b]{0.47\textwidth}
         \centering
         \includegraphics[width=\textwidth]{figures/crossloss.png}
@@ -130,20 +140,19 @@ and determined using Newton's method. The ForwardDiff.jl AD package is used dete
         \caption{solver time}
         \label{fig:synthetic time}
     \end{subfigure}
-    \caption{(a-c) Sample solutions from the data-sets of three of the six synthetic cases. (d) Residual reduction over a single Multi-grid V-cycle on the `test' cases after tuning using the `train' case. Training case `union' refers to the smoother trained on all of the synthetic cases. (b) Time to reduce pressure residual by $10^{-3}$ for classical and parameterized smoothers on each synthetic case. Time is relative to the time of a single V-cycle using the Jacobi smoother.}
-    \label{fig:synthetic cases}
+    \caption{a) Residual reduction over a single Multi-grid V-cycle on the `test' cases after tuning using the `train' case. Training case `union' refers to the smoother trained on all of the synthetic cases. (b) Time to reduce pressure residual by $10^{-3}$ for classical and parameterized smoothers on each synthetic case. Time is relative to the time of a single V-cycle using the Jacobi smoother.}
+    \label{fig:synthetic results}
 \end{figure}
 
-\section{Synthetic Projection Systems and Results}
+\section{Synthetic Discrete Poisson System Results}
 
-A set of six synthetic projection cases were constructed to establish the characteristics of the parameterized smoother. The three 2D cases are shown in Figure~\ref{fig:2D-box}-\ref{fig:2D-sphere}, and each has a matching 3D case. The `static' cases have a hydrostatic gradient throughout the domain, with the direction and magnitude randomized. The `dipole' cases have a localized dipole within a quiescent flow with randomized placement, direction and magnitude. The `sphere' cases have a moving sphere immersed within a quiescent flow with randomized radius, location, and velocity direction. All cases are initialized with $x^0=0$.
+A set of six synthetic projection cases were constructed to establish the characteristics of the parameterized smoother. The three 2D cases are shown in Figure~\ref{fig:synthetic cases}, and each has a matching 3D case. The `static' cases have a hydrostatic gradient throughout the domain, with the direction and magnitude randomized. The `dipole' and `sphere' cases have a randomized dipole/sphere within a quiescent flow. All cases are initialized with $x^0=0$.
 %, and all cases feature initially localized residuals; i.e. $r^0\ne0$ only in a fraction of the cells, but $x$ must be updated throughout the domain, starkly illustrating the elliptic nature of the projection step.
-Neumann boundary conditions are applied on all boundaries, including the immersed sphere, through adjustment of the $A$ matrix coefficients which are otherwise uniform. 
+Neumann boundary conditions are applied on all boundaries, including the boundary of the immersed sphere, through adjustment of the $A$ matrix coefficients which are otherwise uniform. 
 
-Figure~\ref{fig:cross plot} characterizes the generalization of the parameterized smoother's residual reduction over a single V-cycle on 100 randomized `test' case examples after optimization using 100 examples of the `train' case. Each example uses a grid size of $n=32^M$ points ($N=32^2$ in 2D and $N=32^3$ in 3D) as testing with other resolutions found essentially no change in the performance. As expected, the performance is best when testing and training on the same case, with a single V-cycle reducing the residual from $10^{-1.17}$ on the 2D-sphere case down to $10^{-1.58}$ on the 3D-box case. While the performance for the simplest cases generalizes poorly, the 2D-sphere smoother generalizes essentially as well as the `union' smoother trained on all of the data. 
-%The performance of the `union' smoother is only 1-4\% lower than the smoother trained on the test case for the dipole and sphere cases.
+Figure~\ref{fig:cross plot} characterizes the generalization of the parameterized smoother's residual reduction over a single V-cycle on 100 randomized `test' case examples after optimization using 100 examples of the `train' case. Each example uses a grid size of $n=32^M$ points ($N=32^2$ in 2D and $N=32^3$ in 3D) as testing with other resolutions found essentially no change in the performance. Two inner loops are used throughout to optimize residual reduction. As expected, the performance is best when testing and training on the same case, with a single V-cycle reducing the residual from $10^{-1.17}$ on the 2D-sphere case down to $10^{-1.58}$ on the 3D-box case. While the performance for the simplest cases generalizes poorly, the 2D-sphere smoother generalizes essentially as well as the `union' smoother trained on all of the data. 
 
-Finally, the acceleration of the `union' data-driven smoother is evaluated on new example data of a different size, $n=64^M$ points. Figure~\ref{fig:synthetic time} shows the time to reduce the residual of each case by $10^{-3}$ relative to the time to run a single V-cycle using a Jacobi smoother, but the results for the Jacobi smoother are not shown since hundreds or even thousands of V-cycles are required to converge. Remarkably, the Jacobi-like parameterized smoother is only around 33\% slower per V-cycle, and yet converges in only 1-3 V-cycles in all cases. This results in a 80-175\% speed-up relative to optimized serial Gauss-Sidel and SOR smoothers. This speed-up will be even more favorable in parallel computation as the new smoother operates directly on the local residual without back-propagation, eliminating any need for additional communication.
+Finally, the acceleration of the `union' data-driven smoother is evaluated on new example data of a different size, $n=64^M$ points. Figure~\ref{fig:synthetic time} shows the time to reduce the residual of each case by $10^{-3}$ relative to the time to run a single V-cycle using a Jacobi smoother. While a Jacobi smoother take  hundreds or even thousands of V-cycles to converge, the Jacobi-like parameterized smoother is only around 30-50\% slower per V-cycle, and yet converges in only 1-3 V-cycles in all cases. This results in a 80-174\% speed-up (mean: 119\%) relative to optimized serial Gauss-Sidel and SOR smoothers. This speed-up will be even more favorable in parallel computation as the new smoother operates directly on the local residual without back-propagation, eliminating any need for additional communication.
 
 \begin{figure}
     \centering
@@ -162,49 +171,33 @@ Finally, the acceleration of the `union' data-driven smoother is evaluated on ne
         \caption{flapping wing}
         \label{fig:donut}
     \end{subfigure}
-    \begin{minipage}{0.47\textwidth}
-        \begin{subfigure}{\textwidth}
+    % \begin{minipage}{0.47\textwidth}
+        \begin{subfigure}{0.47\textwidth}
         \centering
         \caption{torus flow}
         \label{fig:donut}
         \end{subfigure}
-        \begin{subfigure}{\textwidth}
+        \hfill
+        \begin{subfigure}{0.47\textwidth}
         \centering
         \caption{swimming shark}
-        \label{fig:donut}
+        \label{fig:shark}
         \end{subfigure}
-    \end{minipage}
+    % \end{minipage}
     \hfill
-    \begin{subfigure}[b]{0.47\textwidth}
-        \centering
-        \includegraphics[width=\textwidth]{figures/compareloss.png}
-        \caption{single-cycle residual reduction}
-        \label{fig:simulation residual}
-    \end{subfigure}
-    \caption{(a-e) Snapshots from the five flow simulation cases. The Taylor-Green Vortex and torus flow are 3D cases, and the flapping wing and swimming shark have dynamic geometries. (f) Residual reduction over a single Multi-grid V-cycle for classical and parameterized smoothers on each case. The `transfer' smoother has been trained on the union of the synthetic data sets from Figure~\ref{fig:synthetic cases}.}
+    % \begin{subfigure}[b]{0.47\textwidth}
+    %     \centering
+    %     \includegraphics[width=\textwidth]{figures/compareloss.png}
+    %     \caption{single-cycle residual reduction}
+    %     \label{fig:simulation residual}
+    % \end{subfigure}
+    \caption{(a-e) Snapshots from the five flow simulation cases. The Taylor-Green Vortex and torus flow are 3D, the flapping wing is dynamic without a background flow and the swimming shark is a deforming geometry.}
     \label{fig:simulation cases}
 \end{figure}
 
 \section{Unsteady Incompressible Simulation Results}
 
-\begin{figure}
-    \centering
-    \begin{subfigure}[b]{0.47\textwidth}
-        \centering
-        \includegraphics[width=\textwidth]{figures/diag_fun.png}
-        \caption{diagonal functions}
-        \label{fig:scaled loss}
-    \end{subfigure}
-    \hfill
-    \begin{subfigure}[b]{0.47\textwidth}
-        \centering
-        \includegraphics[width=\textwidth]{figures/lower_fun.png}
-        \caption{off-diagonal functions}
-        \label{fig:simulation time}
-    \end{subfigure}
-        \caption{(a) Diagonal and (b) off-diagonal parameterized functions after optimization on each simulation case. The `transfer' smoother was tuned on the synthetic cases and `Jacobi' is shown for comparison.}
-        \label{fig:tuned simulation}
-\end{figure}
+Five unsteady incompressible simulation cases were used to further characterize the accelerated project method, Figure \ref{fig:simulation cases}. All simulations use the same validated Cartesian-grid flow simulator but feature significantly different physics, i.e. 2D and 3D simulations with and without background flows, immersed geometries, body motion, and body deformation.
 
 \begin{figure}
     \centering
@@ -225,10 +218,32 @@ Finally, the acceleration of the `union' data-driven smoother is evaluated on ne
         \label{fig:tuned simulation}
 \end{figure}
 
+The parameterized smoother from the synthetic cases of the previous section is effective at reducing the residual on the unseen simulation cases, Figure \ref{fig:scaled loss}. This `transfer' smoother achieves 85-95\% of the residual reduction of a smoother optimized for each case. Even more promising is that training on reduced-size simulations closes that small gap almost completely. Training on a $1/4^\text{th}$-scale simulation is fast, requiring only $N_{1/4} = N/4^M$ points (N/16 in 2D and N/64 in 3D) and $\approx 1/4$ the number of time steps, while achieving 99-100\% of the residual reduction of training with full-scale data. Such an \textit{auto-tuning} approach enables a highly effective data-driven projection method to be developed for any simulation approach with very little overhead.
+
+The relative speed-up of this approach is compared to classic MG methods and the transfer smoother in Figure \ref{fig:simulation time}. As with the synthetic cases of the previous section, the data-driven methods are much faster, with the auto-tuned approach accelerating the projection step by 66-120\%.
+
+\begin{figure}
+    \centering
+    \begin{subfigure}[b]{0.47\textwidth}
+        \centering
+        \includegraphics[width=\textwidth]{figures/diag_fun.png}
+        \caption{diagonal functions}
+    \end{subfigure}
+    \hfill
+    \begin{subfigure}[b]{0.47\textwidth}
+        \centering
+        \includegraphics[width=\textwidth]{figures/lower_fun.png}
+        \caption{off-diagonal functions}
+    \end{subfigure}
+        \caption{(a) Diagonal and (b) off-diagonal parameterized functions after optimization on each simulation case. The `transfer' smoother was tuned on the synthetic cases and `Jacobi' is shown for comparison.}
+        \label{fig:tuned inverse}
+\end{figure}
+
+Finally, the parameterized $f_d,\,f_o$ functions used in the approximate inverse equation \ref{eq:approxinv} are shown in Figure \ref{fig:tuned inverse}. It is interesting to note that the diagonal functions are all somewhat centered on one and the off-diagonal values all have an essentially zero intercept as these are the values for the Jacobi smoother. We also note that the `wing' and `shark' cases produce parameterizations which are similar to each other but significantly different than the others cases. This is reasonable as dynamic and deforming geometries put unique burdens on the pressure projection step, as shown in the longer convergence times for these cases shown in Figure \ref{fig:simulation time}. Adopting a data-driven and auto-tuned approach enables these pressure-projection dominated cases to achieve significant accelerations.
 
 \section{Conclusions}
 
-\section*{References}
+This manuscript developed
 
 \bibliography{mybibfile}
 
