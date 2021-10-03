@@ -28,7 +28,7 @@ end
 # Parameterized approximate inverse matrix P
 function PseudoInv(A::FieldMatrix; scale=maximum(A.L),
     p::AbstractVector{T}=Float32[-0.1449,-0.0162,0.00734,0.3635,-0.2018],
-    models=p->(D->1+p[1]+D*(p[2]+D*p[3]),L->L*(p[4]+L*p[5]))) where T
+    models=p->(D->1+p[1]+D*(p[2]+D*p[3]),L->L*(p[4]+L*p[5])),kw...) where T
 
     L,D,N = zeros(T,size(A.L)),zeros(T,size(A.D)),length(size(A.D))
     Dm,Lm = models(p)
