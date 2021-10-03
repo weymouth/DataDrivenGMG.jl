@@ -2,21 +2,28 @@ using GeometricMultigrid
 using GeometricMultigrid: multL, multU, mult, increment!, δ
 
 # Classical smoothers
-@fastmath function GS!(st;inner=2,kw...) # copied from GeometricMultigrid
-    @loop st.ϵ[I] = st.r[I]*st.iD[I]
-    @inbounds for _ ∈ 1:inner, I ∈ st.iD.R
+@fastmath function GS!(st;inner=3,kw...)
+    @inbounds for I ∈ st.iD.R  # optimized first iteration  
+        st.ϵ[I] = st.iD[I]*(st.r[I]-multL(I,st.A.L,st.ϵ))
+    end
+    @inbounds for _ ∈ 2:inner, I ∈ st.iD.R
         st.ϵ[I] = st.iD[I]*(st.r[I]-multL(I,st.A.L,st.ϵ)-multU(I,st.A.L,st.ϵ))
     end
     increment!(st;kw...)
 end
-@fastmath function SOR!(st;inner=2,ω=1.05,kw...)
-    @loop st.ϵ[I] = ω*st.r[I]*st.iD[I]
-    @inbounds for _ ∈ 1:inner, I ∈ st.iD.R
+@fastmath function SOR!(st;inner=3,ω=1.15,kw...)
+    @inbounds for I ∈ st.iD.R  # optimized first iteration
+        st.ϵ[I] = ω*st.iD[I]*(st.r[I]-multL(I,st.A.L,st.ϵ))
+     end
+     @inbounds for _ ∈ 2:inner, I ∈ st.iD.R
        st.ϵ[I] = (1-ω)*st.ϵ[I]+ω*st.iD[I]*(st.r[I]-multL(I,st.A.L,st.ϵ)-multU(I,st.A.L,st.ϵ))
     end
     increment!(st;kw...)
 end
-Jacobi!(st;kw...) = GS!(st,inner=0)
+@fastmath function Jacobi!(st;kw...)
+    @loop st.ϵ[I] = st.r[I]*st.iD[I]
+    increment!(st;kw...)
+end
 
 # Parameterized approximate inverse matrix P
 function PseudoInv(A::FieldMatrix; scale=maximum(A.L),
