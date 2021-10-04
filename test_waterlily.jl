@@ -1,82 +1,16 @@
-using GeometricMultigrid
-import GeometricMultigrid: GS!,pseudo!,SOR!
+using TunedSmoother,BenchmarkTools,Plots
+using TunedSmoother: p₀
 
 # Generate WaterLily simulation data
-begin # this block takes a few minutes...
-    include("create_waterlily.jl")
-    data = create_waterlily(;len=1,p=4)
-end
-
-# Set up a custom mg_state
-begin
-    fill_pseudo!(st;kw...) = fill_pseudo!(st,st.child;kw...)
-    fill_pseudo!(st,child;kw...) = (fill_pseudo!(st,nothing;kw...);fill_pseudo!(child;kw...))
-    fill_pseudo!(st,::Nothing;kw...) = st.P=PseudoInv(st.A;kw...)
-
-    p₀ = Float32[-0.1449,-0.0162,0.00734,0.3635,-0.2018] # result from tune_synthetic
-    function state(x,L,b;p=p₀,xT::Type=eltype(p))
-        xv = FieldVec(zeros(xT,size(x)))
-        @loop xv[I] = x[I]
-        st=mg_state(GeometricMultigrid.Poisson(L),xv,FieldVec(b))
-        s = sum(st.r[I] for I ∈ st.r.R)
-        st.r .-= s/length(st.r.R)
-        fill_pseudo!(st;p)
-        st
-    end
-end
-
-# Filter diverging examples
-begin
-    itcount(data;p=p₀,kw...) = mg!(state(data...;p);reltol=1e-3,inner=2,kw...)
-    avecount(data;kw...) = sum(itcount(d;kw...) for d ∈ data)/length(data)
-    data[wing] = filter(d->itcount(d;smooth! =GS!)<32,data[wing])
-end
-
-# Define loss as average drop in residual after `it` number of Vcycles
-begin
-    Δresid(st;it=1,kw...) = (resid = mg!(st;mxiter=it,inner=2,log=true,kw...);
-                             log10(resid[end]/resid[1])/it)
-    loss(data;p=p₀,kw...) = sum(Δresid(state(d...;p);kw...) for d ∈ data)/length(data)
-end
-
-# Define smoother options and get loss across smoothers
-begin
-    Jacobi!(st;kw...) = GS!(st;inner=0,kw...)
-    smoothers = [Jacobi!,GS!,pseudo!]
-end
-compareloss = [loss(d;smooth!) for smooth! ∈ smoothers, (_,d) ∈ data]
-
-begin # results
-    compareloss = [ -0.4578   -0.633029  -0.645595  -0.603564  -0.581421
-                    -1.33642  -1.48541   -1.46622   -1.3084    -1.35562
-                    -1.65144  -1.48373   -1.45747   -1.31974   -1.43292]
-end
-
-begin
-    using StatsPlots,CategoricalArrays
-    cats = ["Jacobi","Gauss-Sidel","Ã⁻¹ transfer"]
-    ctg = CategoricalArray(repeat(cats,inner=length(data)))
-    levels!(ctg,cats)
-    groupedbar(compareloss', group = ctg, 
-                legend=:bottomright, size = (400,400),
-                yaxis=("log₁₀ residual reduction",:flip),
-                xaxis=("cases",(1:length(data),keys(data))))
-end
-savefig("compareloss.png")
+data = create_waterlily()
 
 # Optimize the psuedo-inverse functions
-# start from a very coarse-grained simulation and work up
 begin # this block takes around 30 minutes. the next block has the results
-    using Optim
-    fit(data;p₀=p₀,it=1) = Optim.minimizer(optimize(p->loss(data;p,it),p₀, Newton(),
-                      Optim.Options(time_limit=60,show_trace=true); autodiff = :forward))
-
     opt = OrderedDict(name=>p₀ for name ∈ keys(data))
     scaleloss = zeros(4,length(opt))
     for scale ∈ 1:4
         @show scale
         scaledata = scale==4 ? data : make_data(p=scale+2)
-        scaledata[wing] = filter(d->itcount(d;smooth! =GS!)<32,scaledata[wing])
         opt = OrderedDict(name=>fit(train;p₀=opt[name]) for (name,train) ∈ scaledata)
         scaleloss[scale,:] .= [loss(test;p=opt[name]) for (name,test) ∈ data]
     end
@@ -152,7 +86,7 @@ end
 
 # time a single Vcycle
 begin
-    using BenchmarkTools
+    using 
     temp!(st;kw...) = mg!(st;inner=2,mxiter=1,kw...)
     jacobi_time = @belapsed temp!(st;smooth! = Jacobi!) setup=(st=state($data[shark][1]...)) #
     gauss_time = @belapsed temp!(st;smooth! = GS!) setup=(st=state($data[shark][1]...)) #
@@ -187,6 +121,38 @@ begin
 end
 savefig("crosscount.png")
 
+begin
+    for (name,h) in ((circle,160),(wing,300),(shark,160))
+        st = state(data[name][end]...)
+        lim = maximum(st.r)
+        st.x.data .-= st.x[1]
+        plot(heatmap(st.A.D[st.x.R]',legend=false,c=:Blues),
+            heatmap(st.x.data[st.x.R]',legend=false,clims=(-1,1)),
+            heatmap(st.r.data[st.x.R]',legend=false,c=:RdBu_11,clims=(-0.1*lim,0.1*lim)),
+            layout = (1,3),size=(900,h),axis=nothing)
+        savefig(string(name)*"triple.png")
+    end
+    for (name,h,i) in ((TGV,300,25),)
+        st = state(data[name][i]...)
+        lim = maximum(st.r)
+        st.x.data .-= st.x[1]
+        plot(heatmap(st.A.D[st.x.R[:,:,end÷4]]',legend=false,c=:Blues),
+            heatmap(st.x.data[st.x.R[:,:,end÷4]]',legend=false),
+            heatmap(st.r.data[st.x.R[:,:,end÷4]]',legend=false,c=:RdBu_11,clims=(-0.1*lim,0.1*lim)),
+            layout = (1,3),aspect_ratio=:equal,size=(900,h),axis=nothing)
+        savefig(string(name)*"triple.png")
+    end
+    for (name,h,i) in ((donut,160,100),)
+        st = state(data[name][i]...)
+        lim = maximum(st.r)
+        st.x.data .-= st.x[1]
+        plot(heatmap(st.A.D[st.x.R[:,:,end÷4]]',legend=false,c=:Blues),
+            heatmap(st.x.data[st.x.R[:,:,end÷4]]',legend=false,clims=(-1,1)),
+            heatmap(st.r.data[st.x.R[:,:,end÷4]]',legend=false,c=:RdBu_11,clims=(-0.1*lim,0.1*lim)),
+            layout = (1,3),aspect_ratio=:equal,size=(900,h),axis=nothing)
+        savefig(string(name)*"triple.png")
+    end
+end
 
 # begin # Optimizing SOR found ω≈0.9
 #     using Optim

@@ -20,7 +20,7 @@ function sim_collect_poisson!(sim;Δt=0.1,remeasure)
 end
 
 function circle(p=6;Re=250,n=16,m=8,T=Float64)
-    radius = 2^(p-3)
+    radius = 2^(p-2)
     center, ν = radius*m/2, radius/Re
     body = AutoBody((x,t)->norm2(x .- center) - radius)
     return Simulation((n*radius+2,m*radius+2), [1.,0.], radius; ν, body, T)
@@ -49,7 +49,7 @@ function donut(p=6;Re=1e3,T=Float64)
 end
 
 using StaticArrays: SVector, @SMatrix
-function wing(p=6;Re=250,U=1,amp=π/4,ϵ=1,thk=2ϵ+√2,T=Float64)
+function wing(p=6;Re=250,U=1,amp=π/4,ϵ=0.5,thk=2ϵ+√2,T=Float64)
     L = 2^(p-1)
     sdf(x,t) = norm2(x .- SVector(0.,clamp(x[2],-L/2,L/2)))-thk/2
     function map(x,t)
@@ -84,6 +84,7 @@ function create_waterlily(;len=100,Δt=0.1,cases=[circle,TGV,donut,wing,shark],p
         @show case
         remeasure = case ∈ (wing,shark)
         sim = case(p;kw...)
+        case == circle && WaterLily.sim_step!(sim,15)
         data[case] = [sim_collect_poisson!(sim;Δt,remeasure) for i ∈ 1:len]
     end
     return data

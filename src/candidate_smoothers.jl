@@ -53,6 +53,8 @@ end
 function state(A,x,b;p=p₀,xT::Type=eltype(p),smooth! =GS!,kw...)
     y = zero(x,xT)     # make FieldVector of type xT
     @loop y[I] = x[I]  # copy values
+    err = sum(b)/length(b)
+    @loop b[I] -= err
     st = mg_state(A,y,b)
     smooth! == pseudo! && fill_pseudo!(st;p,kw...)
     st
