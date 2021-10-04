@@ -21,43 +21,46 @@ end
     increment!(st;kw...)
 end
 @fastmath function Jacobi!(st;kw...)
-    @loop st.ϵ[I] = st.r[I]*st.iD[I]
+    @loop st.ϵ[I] = st.r[I]*st.iD[I] # hacked by TunedJacobi!
     increment!(st;kw...)
 end
 
 # Parameterized approximate inverse matrix P
-function PseudoInv(A::FieldMatrix; scale=maximum(A.L),
-    p::AbstractVector{T}=Float32[-0.1449,-0.0162,0.00734,0.3635,-0.2018],
+p₀ = Float32[-0.100887, -0.00164709, 0.00833292, 0.418425, -0.260235, 0., 0., 0., 0.] # result from tune_synthetic
+function PseudoInv(A::FieldMatrix; scale=maximum(A.L),p::AbstractVector{T}=p₀,
     models=p->(D->1+p[1]+D*(p[2]+D*p[3]),L->L*(p[4]+L*p[5])),kw...) where T
 
     L,D,N = zeros(T,size(A.L)),zeros(T,size(A.D)),length(size(A.D))
     Dm,Lm = models(p)
     for I ∈ A.R
-        invD = (abs(A.D[I])<1e-8) ? 0. : 1.0/A.D[I]
+        invD = (abs(A.D[I])<1e-8) ? 0. : inv(A.D[I])
         D[I] = invD*Dm(A.D[I]/scale)
         for i ∈ 1:N
             J = I-δ(i,N)
-            invD = (abs(A.D[I]+A.D[J])<2e-8) ? 0. : 2.0/(A.D[I]+A.D[J])
+            invD = (abs(A.D[I]+A.D[J])<2e-8) ? 0. : 2inv(A.D[I]+A.D[J])
             L[I,i] = invD*Lm(A.L[I,i]/scale)
         end
     end
     FieldMatrix(L,D,A.R)
 end
+function TunedJacobi!(iD::FieldVector{T},A::FieldMatrix; scale=maximum(A.L),p::AbstractVector{T}=p₀,
+    models=p->(D->1+p[1]+D*(p[2]+D*(p[3]+D*p[4]))),pindex=6,kw...) where T
+    Dm = models(p[pindex:end])
+    @loop iD[I] = (abs(A.D[I])<1e-8) ? 0. : inv(A.D[I])*Dm(A.D[I]/scale)
+end
 
 # Create MG state with st.P
-fill_pseudo!(st;kw...) = fill_pseudo!(st,st.child;kw...)
-fill_pseudo!(st,child;kw...) = (fill_pseudo!(st,nothing;kw...);fill_pseudo!(child;kw...))
-fill_pseudo!(st,::Nothing;kw...) = st.P=PseudoInv(st.A;kw...)
-
-p₀ = Float32[-0.100887, -0.00164709, 0.00833292, 0.418425, -0.260235] # result from tune_synthetic
-function state(A,x,b;p=p₀,xT::Type=eltype(p),kw...)
+function state(A,x,b;p=p₀,xT::Type=eltype(p),smooth! =GS!,kw...)
     y = zero(x,xT)     # make FieldVector of type xT
     @loop y[I] = x[I]  # copy values
     st = mg_state(A,y,b)
-    fill_pseudo!(st;p,kw...)
+    smooth! == pseudo! && fill_pseudo!(st;p,kw...)
     st
 end
 state(A,b;kw...) = state(A,zero(b),b;kw...)
+fill_pseudo!(st;kw...) = fill_pseudo!(st,st.child;kw...)
+fill_pseudo!(st,child;kw...) = (fill_pseudo!(st,nothing;kw...);fill_pseudo!(child;kw...))
+fill_pseudo!(st,::Nothing;kw...) = (st.P=PseudoInv(st.A;kw...); TunedJacobi!(st.iD,st.A;kw...))
 
 # Apply smoother
 pseudo!(st;kw...) = pseudo!(st,st.P;kw...)
