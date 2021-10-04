@@ -2,7 +2,7 @@ using GeometricMultigrid: mg!
 using Optim
 
 # count average V-cycles to get reltol 1e-3
-itcount(d,s;kw...) = mg!(state(d...);reltol=1e-3,smooth! = s, mxiter=32, kw...)
+itcount(d,s;kw...) = mg!(state(d...;kw...);reltol=1e-3,smooth! = s, mxiter=32, kw...)
 avecount(data,s;kw...) = sum(itcount(d,s;kw...) for d ∈ data)/length(data)
 
 # measure average residual reduction after it V-cycles
