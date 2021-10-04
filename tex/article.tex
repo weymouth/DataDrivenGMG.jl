@@ -16,7 +16,7 @@
 
 \begin{frontmatter}
 
-\title{Auto-tuned Multi-grid Solver for Accelerated \\ Pressure Projection}
+\title{Data-Driven Multi-grid Solver for Accelerated \\ Pressure Projection}
 
 %% Group authors per affiliation:
 \author{Gabriel D Weymouth}
@@ -25,7 +25,7 @@
 \ead[url]{https://weymouth.github.io/}
 
 \begin{abstract}
-Pressure projection is the single most computationally expensive step in an unsteady incompressible fluid simulation. This work discusses the potential of data-driven methods to accelerate the approximate solution of the Poisson equation at the heart of pressure projection, linking Multigrid methods to Convolutional Neural Networks. Required to maintain linearity in pressure, the best option for data-driven acceleration is in the smoothing step. Using automatic differentiation, a high-speed parameterized smoother is developed which out-performs classic Multi-grid methods by 66-185\% on eleven 2D and 3D benchmarks. The tuned parameters are found to transfer nearly 100\% effectiveness as the resolution is increased, providing a robust approach for accelerated pressure projection of any flow.
+Pressure projection is the single most computationally expensive step in an unsteady incompressible fluid simulation. This work discusses the potential of data-driven methods to accelerate the approximate solution of the Poisson equation at the heart of pressure projection, linking Multi-grid methods to convolutional encoder-decoder networks. Required to maintain linearity in pressure, the best option for data-driven acceleration is in the smoothing step. Using automatic differentiation, a high-speed parameterized smoother is developed which accelerates classic Multi-grid methods by 66-185\% on eleven 2D and 3D benchmarks with no loss of accuracy. The tuned parameters are found to transfer nearly 100\% effectiveness as the resolution is increased, providing a robust approach for accelerated pressure projection of general flows.
 \end{abstract}
 
 \begin{keyword}
@@ -36,11 +36,20 @@ pressure projection, linear algebra, data-driven
 
 \section{Introduction}
 
-Pressure projection is a bottleneck in high-speed unsteady incompressible flow solvers. Constructing approximate solutions the discrete pressure Poisson system typically makes up 25-50\% of the solution cost even in serial simulations, and the proportional cost grows in massively parallel simulations as the elliptic equation requires communication throughout the computational domain instead of being confined to a local characteristic. Methods such as artificial-compressibility, smooth-particle-hydrodynamics, and particle-in-cell attempt to side-step this computational cost by modelling or otherwise under-resolving the pressure evolution compared to the fluid's momentum. However, these approaches lead to significant errors in pressure forces, thereby making them unsuitable for many applications or requiring explicit pressure corrections.
+Pressure projection is a bottleneck in high-speed unsteady incompressible flow solvers. Constructing approximate solutions the discrete pressure Poisson system is the most expensive part of each time-step as the elliptic equation requires communication throughout the computational domain instead of being confined to a local characteristic. As such, the proportional cost only grows in massively parallel simulations due to the required communication across processes. Methods such as artificial-compressibility \cite{he2002comparison}, smooth-particle-hydrodynamics \cite{kiara2013sph}, and particle-in-cell \cite{jiang2017angular} attempt to side-step this computational cost by modelling or otherwise under-resolving the pressure evolution compared to the fluid's momentum. However, these approaches lead to significant errors in pressure forces, thereby making them unsuitable for many applications or requiring explicit pressure corrections, \cite{kiara2013sph}.
 
-Recent advances in data-driven acceleration of flow solvers have mainly focused on data-assimilation methods and data-driven turbulence closures. Data-assimilation methods typically avoid the expensive pressure projection step entirely, focusing on applications where time-accurate pressure forces are not important. Data-driven closures for Large Eddy Simulation (LES) and Unsteady Reynolds Averaged Navier-Stokes (unRANS) and even Spanwise Averaged Navier-Stokes (SANS) simulations have seen growing success and are capable of accurate force prediction. Deep learning Convolutional Neural Networks (CNN) have enabled many of these turbulence closures as well as other fluids applications such as super-resolution and generative models. CNN architectures have inherent translational symmetry and often use a restriction phase, where the size of the network is reduced before expanding again, both of which help generalize the trained networks to unseen prediction cases. 
+Recent advances in data-driven acceleration of flow solvers have mainly focused on data-assimilation methods and data-driven turbulence closures. Data-assimilation methods typically avoid the expensive pressure projection step entirely, focusing on applications where time-accurate pressure forces are not important \cite{asch2016data}. Deep learning closures for Large Eddy Simulation (LES) \cite{BECK2019108910,maulik_san_rasheed_vedula_2019}, Unsteady Reynolds Averaged Navier-Stokes (unRANS) \cite{ling_kurzawski_templeton_2016}, and even Spanwise Averaged Navier-Stokes (SANS) \cite{font2021deep} simulations have seen growing success and are capable of accurate force prediction. 
 
-However, none of these studies have applied data-driven techniques to accelerate the critical projection step itself. Some recent work has focused on the pressure projection step explicitly. Chaotic projection methods for massively parallel systems; not data driven. Multi-grid data-driven decomposition; high errors and unclear speed-up. This work develops a high-speed data-driven project method which outperforms classic methods on eleven 2D and 3D benchmarks. Moreover, as the approach in linear in the pressure and scale-invariant, the parameters can be tuned on a coarse simulation and maintain their accelerated performance on unseen fine-grid simulations.
+\begin{figure}
+    \caption{Sketch of a Convolutional Neural Networks (CNN) and/or a Multi-grid V-cycle.}
+    \label{fig:multigrid}
+\end{figure}
+
+Many of these turbulence closures as well as other fluids applications such as super-resolution \cite{ferdian20204dflownet,liu2020deep} and full field regression models \cite{duru2021cnnfoil,bhatnagar2019prediction} are based on Convolutional Neural Networks (CNN) and encoder-decoder architectures. CNNs have inherent translational symmetry and encoder-decoder architectures reduce the number of variables before expanding again, Figure \ref{fig:multigrid}, both of which help constrain learning capacity and generalize the trained networks to unseen prediction cases. 
+
+A few studies have applied machine-learning to accelerate the critical projection step itself, \cite{ozbay2021poisson,Xiao2020,ajuria2020}. All of these approaches use CNNs, attempting to predict the pressure field given the projection source term on a uniform grid, meaning they are limited to cases without internal solid geometries. While \cite{ozbay2021poisson} uses a decomposition to handle different \textit{domain} boundary conditions and grid aspect ratios in 2D and sees a significant speed-up over traditional Multi-grid methods, the results are still somewhat qualitative, with pressure errors greater than 10\% throughout much of the domain.
+
+The primary insight of this paper is that Multi-grid methods are \textit{already} convolutional encoder-decoder networks with optimal $O(N\log N)$ scaling, prime for data-driven acceleration without any loss of accuracy in the resulting pressure field. This work develops a high-speed data-driven projection method which outperforms classic Multi-grid on eleven 2D and 3D benchmarks including those with immersed solid boundaries. Moreover, since the approach is linear in the pressure and the nonlinear dependence on the matrix coefficients are scale-invariant, the data-optimized parameters generalize extremely well to new flows and simulation resolutions.
 
 \section{Linear System Description}
 
@@ -60,24 +69,24 @@ where $r$ is the residual. In practise, only an approximate solution for $\epsil
 \end{equation}
 This process is iterated until the residual is reduced sufficiently, the required tolerance level being highly dependant on the application.
 
-Multi-grid (MG) methods are among the fastest iterative solution approaches for variable coefficient discrete pressure Poisson equations. The MG operator is effectively a \textit{linear} convolutional architecture where the system is preconditioned before the residual is restricted down to a reduced-size problem and the correction is prolongated back up. 
+Multi-grid (MG) methods are among the fastest iterative solution approaches for variable coefficient discrete pressure Poisson equations because the MG operator is effectively a \textit{linear} convolutional encoder-decoder network, Figure \ref{fig:multigrid}. The system is preconditioned before the residual is restricted down to a reduced-size problem and the correction is prolongated back up. 
 % \begin{equation}
 %     r_c = R r \quad\rightarrow\quad A_c \epsilon_c = r_c \quad\rightarrow\quad \epsilon = P \epsilon_c
 % \end{equation}
 % where $R$ is the $N_c \times N$ restriction operator, $P$ is the $N \times N_c$ prolongation operator 
-The restriction-solve-prolongation process, a V-cycle, distributes the residual throughout the domain, which enables simple and relatively fast stationary methods such as Gauss-Sidel or Successive Over Relation (SOR) to \textit{smooth} the local high-frequency error in the projected solution. The MG architecture proceeds recursively on the reduced-size problems until a small linear algebra problem is reached which can be approximated with minimal cost. This recursive approach results in only $O(N\log N)$ computational cost.
+The restriction-solve-prolongation process, a V-cycle, distributes the residual throughout the domain, which enables simple and relatively fast stationary methods such as Gauss-Sidel or Successive Over Relation (SOR) to smooth the local error in the projected solution. The MG architecture proceeds recursively on the reduced-size problems until a small linear algebra problem is reached which can be approximated with minimal cost. This recursive approach results in $O(N\log N)$ computational cost.
 
 \section{Data-driven Accelerated Projection Method}
 
-As \textit{any} element of the residual of the elliptic system potentially influences \textit{every} element of the update, $O(N\log N)$ is the best possible solution time scaling. However, data-driven methods can still be used to accelerate pressure projection methods by speeding-up and increasing the residual reduction of each V-cycle iteration.
+As \textit{any} element of the residual of the elliptic Poisson system potentially influences \textit{every} element of the update, $O(N\log N)$ is the best possible solution time scaling. However, data-driven methods can still be used to accelerate pressure projection methods by speeding-up and increasing the residual reduction of each V-cycle iteration.
 
-The linearity of equation \ref{eq:aer} is a critical property which the data-driven method must maintain in order to be useful in practise, but this linearity is only with respect to the update and residual fields. The operators of the ``MG network'' can all potentially be optimized for a specific sub-class of problems. In particular, those operators can be made into parameterized nonlinear functions of $A$, embedding information about the discrete problem and boundary conditions. 
+The linearity of equation \ref{eq:aer} is a critical property which the data-driven method must maintain. Not only will this increase generality, but a nonlinear method could not be used iteratively since the modes of the residual will change as the solver converges. However, this linearity is only with respect to the update and residual fields. The operators of the MG method can all potentially be optimized for a specific sub-class of problems. In particular, those operators can be made into parameterized nonlinear functions of $A$, embedding information about the discrete problem and boundary conditions. 
 
-Which MG operation is the best candidate for such an approach? The prolongation operator (restriction simply being its transpose) is not inherently a function of $A$, and while related super-resolution operators have seen improvements in the literature, these are always nonlinear functions of the field. The precondition operator is an option, but a simple Jacobi preconditioner
+Which MG operation is the best candidate for such an approach? The prolongation operator (restriction simply being its transpose) is not inherently a function of $A$, and while related super-resolution operators have seen use in the literature, these are always nonlinear functions of the field. The precondition operator is an option, but a simple Jacobi preconditioner
 \begin{equation}
     \epsilon = D^{-1}r
 \end{equation}
-where $D$ is the diagonal of $A$, is as fast as possible and is sufficient for the V-cycle to distribute the residual throughout the domain. Therefore, for the remainder of the paper we will focus on the smoother as the best candidate for acceleration, using a simple Jacobi preconditioner and uniform pooling/distribution for restriction/prolongation.
+where $D$ is the diagonal of $A$, is as fast as possible and is sufficient for the V-cycle to distribute the residual throughout the domain. Therefore, for the remainder of the paper we will focus on the smoother as the best candidate for parameterization, using a simple Jacobi preconditioner and uniform pooling/distribution for restriction/prolongation.
 
 While more complex options are certainly possible, this work uses a simple parameterized Jacobi-like smoother
 \begin{equation}\label{eq:smooth}
@@ -98,9 +107,9 @@ The parameterized smoother is optimized for a set of training data $X=\{A,x^k,b\
 \begin{equation}
     \hat\theta = \min_\theta L(\theta\, |X)
 \end{equation}
-and determined using Newton's method. Automatic differentiation (AD) is used to determine the gradient $\nabla_\theta L$ and Hessian $H_{\theta\theta} L$, avoiding inaccurate and potentially unstable finite differences of the nonlinear recursive loss function.
+and determined using Newton's method. Automatic differentiation (AD) is used to determine the gradient $\nabla_\theta L$ and Hessian $H_{\theta\theta} L$ \cite{RevelsLubinPapamarkou2016}, avoiding inaccurate and potentially unstable finite differences of the nonlinear recursive loss function.
 
-The data-driven solver and all the test cases and figures presented in the following sections are implemented in Julia and available for reproduction.
+The data-driven solver and all test cases presented in the following sections are implemented in Julia and available for reproduction \cite{bezanson2017julia,weymouth2021julia}.
 
 \begin{figure}
     \centering
@@ -152,7 +161,7 @@ Neumann boundary conditions are applied on all boundaries, including the boundar
 
 Figure~\ref{fig:cross plot} characterizes the generalization of the parameterized smoother's residual reduction over a single V-cycle on 100 randomized `test' case examples after optimization using 100 examples of the `train' case. Each example uses a grid size of $n=32^M$ points ($N=32^2$ in 2D and $N=32^3$ in 3D) as testing with other resolutions found essentially no change in the performance. Two inner loops are used throughout to optimize residual reduction. As expected, the performance is best when testing and training on the same case, with a single V-cycle reducing the residual from $10^{-1.17}$ on the 2D-sphere case down to $10^{-1.58}$ on the 3D-box case. While the performance for the simplest cases generalizes poorly, the 2D-sphere smoother generalizes essentially as well as the `union' smoother trained on all of the data. 
 
-Finally, the acceleration of the `union' data-driven smoother is evaluated on new example data of a different size, $n=64^M$ points. Figure~\ref{fig:synthetic time} shows the time to reduce the residual of each case by $10^{-3}$ relative to the time to run a single V-cycle using a Jacobi smoother. While a Jacobi smoother take  hundreds or even thousands of V-cycles to converge, the Jacobi-like parameterized smoother is only around 30-50\% slower per V-cycle, and yet converges in only 1-3 V-cycles in all cases. This results in a 80-174\% speed-up (mean: 119\%) relative to optimized serial Gauss-Sidel and SOR smoothers. This speed-up will be even more favorable in parallel computation as the new smoother operates directly on the local residual without back-propagation, eliminating any need for additional communication.
+Finally, the acceleration of the `union' data-driven smoother is evaluated on new example data of a different size, $n=64^M$ points. Figure~\ref{fig:synthetic time} shows the time to reduce the residual of each case by $10^{-3}$ relative to the time to run a single V-cycle using a Jacobi smoother. While a Jacobi smoother requires  hundreds or even thousands of V-cycles to converge, the Jacobi-like parameterized smoother is only around 30-50\% slower per V-cycle, and yet converges in only 1-3 V-cycles in all cases. This results in a 80-174\% speed-up (mean: 119\%) relative to optimized serial Gauss-Sidel and SOR smoothers. This speed-up will be even more favorable in parallel computation as the new smoother operates directly on the local residual without back-propagation, eliminating any additional communication.
 
 \begin{figure}
     \centering
@@ -169,7 +178,7 @@ Finally, the acceleration of the `union' data-driven smoother is evaluated on ne
     \begin{subfigure}[b]{0.3\textwidth}
         \centering
         \caption{flapping wing}
-        \label{fig:donut}
+        \label{fig:wing}
     \end{subfigure}
     % \begin{minipage}{0.47\textwidth}
         \begin{subfigure}{0.47\textwidth}
@@ -197,7 +206,7 @@ Finally, the acceleration of the `union' data-driven smoother is evaluated on ne
 
 \section{Unsteady Incompressible Simulation Results}
 
-Five unsteady incompressible simulation cases were used to further characterize the accelerated project method, Figure \ref{fig:simulation cases}. All simulations use the same validated Cartesian-grid flow simulator but feature significantly different physics, i.e. 2D and 3D simulations with and without background flows, immersed geometries, body motion, and body deformation.
+Five unsteady incompressible simulation cases were used to further characterize the accelerated projection method, Figure \ref{fig:simulation cases}. All simulations use the same validated Cartesian-grid method \cite{maertens2015accurate} but feature significantly different physics, i.e. 2D and 3D simulations with and without background flows, immersed geometries, body motion, and body deformation.
 
 \begin{figure}
     \centering
@@ -243,7 +252,10 @@ Finally, the parameterized $f_d,\,f_o$ functions used in the approximate inverse
 
 \section{Conclusions}
 
-This manuscript developed
+This manuscript develops a successful data-driven method to accelerate the solution of discrete pressure Poisson systems found in incompressible flow simulations. Mathematical constraints are used to focus the learning capacity to a parameterized Jacobi-like Multi-grid smoother. Being a sparse matrix-vector multiplication, this function is nearly as fast as a trivial Jacobi smoother, and much faster than Gauss-Sidel or SOR smoothing. After using automatic-differentiation for training, the data-driven MG method is found to accelerate projection by 66-185\% on eleven simulation cases. Because of the reduced learning capacity, the generalization is excellent, enabling 90\% effective transfer learning from a synthetic data-set and essentially perfect transfer from reduced resolution simulations. 
+
+The potential of machine learning and computer science advances to improve fluid dynamics is vast, but well-applied classical methods and constraints only helps to focus this effort. Wherever possible, this work has made the simplest choice in parameterization, leaving significant opportunities for future improvements. Many other flow solvers and linear systems are yet to be explored, and extensions to this basic data-driven approach could accelerate solutions for a wide array of discrete partial differential equations. 
+
 
 \bibliography{mybibfile}
 
