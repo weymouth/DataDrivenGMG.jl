@@ -125,7 +125,7 @@ savefig("crosscount.png")
 
 begin
     using GeometricMultigrid: Vcycle!
-    for (name,h) in ((circle,160),(wing,400),(shark,160))
+    for (name,h) in ((circle,160),(wing,300),(shark,160))
         smooth! = pseudo!
         st = state(data[name][end]...;smooth!)
         x = copy(st.x.data)
