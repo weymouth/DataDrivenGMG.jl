@@ -1,4 +1,4 @@
-using TunedSmoother,BenchmarkTools,Plots
+using TunedSmoother,BenchmarkTools,Plots,DataStructures
 using TunedSmoother: p₀
 
 # Generate WaterLily simulation data
@@ -11,7 +11,7 @@ begin # this block takes around 30 minutes. the next block has the results
     scaleloss[1,:] .= [loss(test;p=p₀,smooth!) for (name,test) ∈ data]
     for scale ∈ 1:4
         @show scale
-        scaledata = scale==4 ? data : create_waterlily(p=scale+2)
+        scaledata = scale==4 ? data : create_waterlily(p=scale+2,cases=keys(data))
         opt = OrderedDict(name=>fit(train,opt[name]) for (name,train) ∈ scaledata)
         scaleloss[scale+1,:] .= [loss(test;p=opt[name],smooth!) for (name,test) ∈ data]
     end
@@ -123,10 +123,14 @@ begin
 end
 savefig("crosscount.png")
 
+data = create_waterlily(cases=[TGV,donut])
 begin
     using GeometricMultigrid: Vcycle!
-    for (name,h) in ((circle,160),(wing,300),(shark,160))
+    # for (name,h) in ((circle,160),(wing,300),(shark,160))
+    # for (name,h) in ((TGV,300),)
+    for (name,h) in ((donut,160),)
         smooth! = pseudo!
+        # st = state(data[name][25]...;smooth!)
         st = state(data[name][end]...;smooth!)
         x = copy(st.x.data)
         x .-= st.x[1]
@@ -134,32 +138,14 @@ begin
         r = copy(st.r)
         f(x) = @. log10(clamp(abs(x),1e-6,Inf64))
         Vcycle!(st;smooth!)
-        plot(heatmap(x[st.x.R]',legend=false,clims=(-1,1)),
-        heatmap(f(r.data[st.x.R]'),legend=false,c=:Reds,clims=(-6,-1)),
-        heatmap(f(st.r.data[st.x.R]'),legend=false,c=:Reds,clims=(-6,-1)),
+        # plot(heatmap(x[st.x.R]',legend=false,clims=(-1,1)),
+        # heatmap(f(r.data[st.x.R]'),legend=false,c=:Reds,clims=(-6,-1)),
+        # heatmap(f(st.r.data[st.x.R]'),legend=false,c=:Reds,clims=(-6,-1)),
+        plot(heatmap(x[st.x.R[:,:,end÷4]]',legend=false,clims=(-1,1)),
+        # plot(heatmap(x[st.x.R[:,:,end÷4]]',legend=false),
+        heatmap(f(r.data[st.x.R[:,:,end÷4]]'),legend=false,c=:Reds,clims=(-6,-1)),
+        heatmap(f(st.r.data[st.x.R[:,:,end÷4]]'),legend=false,c=:Reds,clims=(-6,-1)),
         layout = (1,3),size=(900,h),axis=nothing)
-        savefig(string(name)*"triple.png")
-    end
-end
-begin
-    for (name,h,i) in ((TGV,300,25),)
-        st = state(data[name][i]...)
-        lim = maximum(st.r)
-        st.x.data .-= st.x[1]
-        plot(heatmap(st.A.D[st.x.R[:,:,end÷4]]',legend=false,c=:Blues),
-            heatmap(st.x.data[st.x.R[:,:,end÷4]]',legend=false),
-            heatmap(st.r.data[st.x.R[:,:,end÷4]]',legend=false,c=:RdBu_11,clims=(-0.1*lim,0.1*lim)),
-            layout = (1,3),aspect_ratio=:equal,size=(900,h),axis=nothing)
-        savefig(string(name)*"triple.png")
-    end
-    for (name,h,i) in ((donut,160,100),)
-        st = state(data[name][i]...)
-        lim = maximum(st.r)
-        st.x.data .-= st.x[1]
-        plot(heatmap(st.A.D[st.x.R[:,:,end÷4]]',legend=false,c=:Blues),
-            heatmap(st.x.data[st.x.R[:,:,end÷4]]',legend=false,clims=(-1,1)),
-            heatmap(st.r.data[st.x.R[:,:,end÷4]]',legend=false,c=:RdBu_11,clims=(-0.1*lim,0.1*lim)),
-            layout = (1,3),aspect_ratio=:equal,size=(900,h),axis=nothing)
         savefig(string(name)*"triple.png")
     end
 end

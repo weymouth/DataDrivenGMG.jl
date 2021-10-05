@@ -49,7 +49,7 @@ function donut(p=6;Re=1e3,T=Float64)
 end
 
 using StaticArrays: SVector, @SMatrix
-function wing(p=6;Re=250,U=1,amp=π/4,thk=2+√2,T=Float64)
+function wing(p=6;Re=250,U=1,amp=π/4,ϵ=0.5,thk=2ϵ+√2,T=Float64)
     L = 2^(p-1)
     sdf(x,t) = norm2(x .- SVector(0.,clamp(x[2],-L/2,L/2)))-thk/2
     function map(x,t)
@@ -57,7 +57,7 @@ function wing(p=6;Re=250,U=1,amp=π/4,thk=2+√2,T=Float64)
         R * (x.-SVector(3L+L*sin(t*U/L)+0.01,4L))
     end
     body = AutoBody(sdf,map)
-    Simulation((6L+2,6L+2),zeros(2),L;U,ν=U*L/Re,body,T)
+    Simulation((6L+2,6L+2),zeros(2),L;U,ν=U*L/Re,body,ϵ,T)
 end
 
 using Interpolations
