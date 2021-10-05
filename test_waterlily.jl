@@ -124,16 +124,24 @@ end
 savefig("crosscount.png")
 
 begin
-    for (name,h) in ((circle,160),(wing,300),(shark,160))
-        st = state(data[name][end]...)
-        lim = maximum(st.r)
-        st.x.data .-= st.x[1]
-        plot(heatmap(st.A.D[st.x.R]',legend=false,c=:Blues),
-            heatmap(st.x.data[st.x.R]',legend=false,clims=(-1,1)),
-            heatmap(st.r.data[st.x.R]',legend=false,c=:RdBu_11,clims=(-0.1*lim,0.1*lim)),
-            layout = (1,3),size=(900,h),axis=nothing)
+    using GeometricMultigrid: Vcycle!
+    for (name,h) in ((circle,160),(wing,400),(shark,160))
+        smooth! = pseudo!
+        st = state(data[name][end]...;smooth!)
+        x = copy(st.x.data)
+        x .-= st.x[1]
+        x[st.A.D .> -1.5] .= NaN
+        r = copy(st.r)
+        f(x) = @. log10(clamp(abs(x),1e-6,Inf64))
+        Vcycle!(st;smooth!)
+        plot(heatmap(x[st.x.R]',legend=false,clims=(-1,1)),
+        heatmap(f(r.data[st.x.R]'),legend=false,c=:Reds,clims=(-6,-1)),
+        heatmap(f(st.r.data[st.x.R]'),legend=false,c=:Reds,clims=(-6,-1)),
+        layout = (1,3),size=(900,h),axis=nothing)
         savefig(string(name)*"triple.png")
     end
+end
+begin
     for (name,h,i) in ((TGV,300,25),)
         st = state(data[name][i]...)
         lim = maximum(st.r)

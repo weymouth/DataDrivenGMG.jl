@@ -84,25 +84,9 @@ function create_waterlily(;len=100,Δt=0.1,cases=[circle,TGV,donut,wing,shark],p
         @show case
         remeasure = case ∈ (wing,shark)
         sim = case(p;kw...)
+        case==circle && WaterLily.sim_step!(sim,20)
         case == circle && WaterLily.sim_step!(sim,15)
         data[case] = [sim_collect_poisson!(sim;Δt,remeasure) for i ∈ 1:len]
     end
     return data
 end
-
-using Plots
-function gifit(data,j,center)
-    if center
-        for d ∈ data
-            d[j] .-= d[j][2,2]
-        end
-    end
-    R = inside(data[1][j])
-    lim = maximum(maximum(abs.(d[j][R])) for d ∈ data)
-    gr(show=false)
-    @gif for d ∈ data
-        heatmap(d[j][R]',aspect_ratio=:equal,c=palette(:RdBu_11),clims=(-lim/10,lim/10))
-    end
-end
-gifp(data) = gif(data,1,true)
-gifσ(data) = gif(data,3,false)
