@@ -3,31 +3,33 @@ using TunedSmoother: p₀
 
 # Generate WaterLily simulation data
 data = create_waterlily()
-
 # Optimize the psuedo-inverse functions
 begin # this block takes around 30 minutes. the next block has the results
+    smooth! = pseudo!
     opt = OrderedDict(name=>p₀ for name ∈ keys(data))
-    scaleloss = zeros(4,length(opt))
+    scaleloss = zeros(5,length(opt))
+    scaleloss[1,:] .= [loss(test;p=p₀,smooth!) for (name,test) ∈ data]
     for scale ∈ 1:4
         @show scale
-        scaledata = scale==4 ? data : make_data(p=scale+2)
-        opt = OrderedDict(name=>fit(train;p₀=opt[name]) for (name,train) ∈ scaledata)
-        scaleloss[scale,:] .= [loss(test;p=opt[name]) for (name,test) ∈ data]
+        scaledata = scale==4 ? data : create_waterlily(p=scale+2)
+        opt = OrderedDict(name=>fit(train,opt[name]) for (name,train) ∈ scaledata)
+        scaleloss[scale+1,:] .= [loss(test;p=opt[name],smooth!) for (name,test) ∈ data]
     end
 end
 
 begin # output from the block above
     opt = OrderedDict(
-        circle => [0.266145, 0.176086, 0.0344038, 0.453681, -0.27995],
-        TGV    => [-0.150537, -0.0375542, 0.00201316, 0.329784, -0.201799],
-        donut  => [0.20243, 0.0752068, 0.0116999, 0.323697, -0.189171],
-        wing   => [-0.108999, -0.193017, -0.0354521, 0.532743, -0.340341],
-        shark  => [-0.282117, -0.283407, -0.0472922, 0.577397, -0.402278])
+        circle => [0.0271442, -0.0248311, -0.000622211, 0.651889, -0.476478, 1.9026, 1.28664, 0.24255, 0.0105331],
+        TGV    => [-0.188616, -0.0378252, 0.00345329, 0.39165, -0.260235, -3.87929, -2.60139, -0.538449, -0.0352438],
+        donut  => [-0.116905, -0.0244976, 0.00293478, 0.274545, -0.148386, -0.579809, -0.771899, -0.19491, -0.0143433],
+        wing   => [-0.21447, -0.245247, -0.041811, 0.790682, -0.613002, -0.101302, -0.447094, -0.350419, -0.0669029],
+        shark  => [-0.263364, -0.270855, -0.0459526, 0.824633, -0.653598, -0.0514562, -0.166805, -0.145901, -0.0262677])
 
-    scaleloss= [-1.73515  -1.69368  -1.63451  -1.36256  -1.46331
-                -1.7428   -1.73446  -1.65058  -1.37201  -1.47126
-                -1.73086  -1.73621  -1.65165  -1.37961  -1.47637
-                -1.74365  -1.73657  -1.65264  -1.38306  -1.47978]        
+    scaleloss= [-1.75988  -1.52343  -1.48713  -1.37156  -1.45274
+                -1.74066  -1.69835  -1.63697  -1.4343   -1.46331
+                -1.78684  -1.73532  -1.6444   -1.4343   -1.47126
+                -1.75631  -1.73744  -1.65368  -1.43682  -1.47672
+                -1.80746  -1.73826  -1.65799  -1.43997  -1.50454]
 end
 
 # plot loss across examples and scales
@@ -36,7 +38,7 @@ begin
     cats = ["transfer","⅛","¼","½","1"]
     ctg = CategoricalArray(repeat(cats,inner=length(data)))
     levels!(ctg,cats)
-    groupedbar([compareloss[end,:] scaleloss'], size = (400,400),
+    groupedbar(scaleloss', size = (400,400),
                 group=ctg, legend=:bottomright, palette=:Greens_5,
                 yaxis=("log₁₀ residual reduction",:flip),
                 xaxis=("cases",(1:length(data),keys(data))),)
@@ -153,20 +155,3 @@ begin
         savefig(string(name)*"triple.png")
     end
 end
-
-# begin # Optimizing SOR found ω≈0.9
-#     using Optim
-#     ω_loss(data;ω) = sum(Δresid(state(d...;xT=typeof(ω));inner=2,smooth! = SOR!,ω) for d ∈ data)/length(data)
-#     ω_fit(data;ω₀=1.0) = Optim.minimizer(optimize(p->ω_loss(data;ω=p[1]),[ω₀], Newton(),
-#                       Optim.Options(time_limit=60,show_trace=true); autodiff = :forward))[1]
-
-#     for scale ∈ 1:3
-#         @show scale
-#         scaledata = scale==4 ? data : make_data(p=scale+2)
-#         scaledata[wing] = filter(d->itcount(d;smooth! =GS!)<32,scaledata[wing])
-#         ω_opt = OrderedDict(name=>ω_fit(train) for (name,train) ∈ scaledata)
-#         @show ω_opt
-#         ω_error = OrderedDict(name=>ω_loss(test;ω=ω_opt[name]) for (name,test) ∈ data)
-#         @show ω_error
-#     end
-# end
