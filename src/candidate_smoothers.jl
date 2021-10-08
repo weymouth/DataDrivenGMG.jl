@@ -26,12 +26,13 @@ end
 end
 
 # Parameterized approximate inverse matrix P
-p₀ = Float32[-0.100887, -0.00164709, 0.00833292, 0.418425, -0.260235, 0., 0., 0., 0.] # result from tune_synthetic
+# p₀ = Float32[-0.182866, -0.0351219, 0.00462202, 0.382929, -0.230043, 0.0644419, 0.234885, 0.0664019] # result from tune_synthetic
+p₀ = zeros(Float32,12) # result from tune_synthetic
 function PseudoInv(A::FieldMatrix; scale=maximum(A.L),p::AbstractVector{T}=p₀,
-    models=p->(D->1+p[1]+D*(p[2]+D*p[3]),L->L*(p[4]+L*p[5])),kw...) where T
+    pmodels=p->(D->1+p[1]+D*(p[2]+D*p[3]),L->L*(p[4]+L*p[5])),kw...) where T
 
     L,D,N = zeros(T,size(A.L)),zeros(T,size(A.D)),length(size(A.D))
-    Dm,Lm = models(p)
+    Dm,Lm = pmodels(p)
     for I ∈ A.R
         invD = (abs(A.D[I])<1e-8) ? 0. : inv(A.D[I])
         D[I] = invD*Dm(A.D[I]/scale)
@@ -44,8 +45,8 @@ function PseudoInv(A::FieldMatrix; scale=maximum(A.L),p::AbstractVector{T}=p₀,
     FieldMatrix(L,D,A.R)
 end
 function TunedJacobi!(iD::FieldVector{T},A::FieldMatrix; scale=maximum(A.L),p::AbstractVector{T}=p₀,
-    models=p->(D->1+p[1]+D*(p[2]+D*(p[3]+D*p[4]))),pindex=6,kw...) where T
-    Dm = models(p[pindex:end])
+    jmodel=p->(D->1+p[6]+D*(p[7]+D*p[8])),kw...) where T
+    Dm = jmodel(p)
     @loop iD[I] = (abs(A.D[I])<1e-8) ? 0. : inv(A.D[I])*Dm(A.D[I]/scale)
 end
 

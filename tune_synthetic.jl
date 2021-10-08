@@ -1,9 +1,19 @@
 using TunedSmoother, Plots, DataStructures
-using TunedSmoother: p₀
 
 # create synthetic example systems
-begin
     data = create_synthetic(len=25)
+
+# create Parameterized preconditioner and smoother 
+begin
+    # function lerp(x,y)
+    #     i = floor(Int,x); dx = x-i
+    #     i+2>length(y) && return y[end]
+    #     y[i+2]*dx+y[i+1]*(1-dx)
+    # end
+    hermite(t,p)=(2t^3-3t^2+1)*p[1]+(t^3-2t^2+t)*p[2]+(-2t^3+3t^2)p[3]+(t^3-t^2)*p[4]
+    pmodels(p) = (D->1+hermite(-D/6,p[1:4]),L->hermite(L,p[5:8]))
+    jmodel(p) = D->1+hermite(-D/6,p[9:12])
+    p₀ = zeros(Float32,12)
     opt = OrderedDict(name=>p₀ for name ∈ keys(data))
     opt["union"] = p₀
 end
@@ -12,15 +22,11 @@ end
 begin
     for (name,train) ∈ data
         @show name
-        opt[name] = fit(train,opt[name])
+        opt[name] = fit(train,opt[name];pmodels,jmodel)
     end
     @show "union"
-    opt["union"] = fit(vcat((d for (_,d) in data)...),opt["union"])
+    opt["union"] = fit(vcat((d for (_,d) in data)...),opt["union"];pmodels,jmodel)
     opt
-end
-begin # more training?
-    name = "3D-static"
-    opt[name] = fit(data[name],opt[name])        
 end
 begin
     opt = OrderedDict(
@@ -30,11 +36,11 @@ begin
         "3D-dipole" => [0.115248, -0.000663957, 0.000381931, 0.389719, -0.260235, 0.0322515, 0.101498, 0.00717328, -0.00287373],
         "2D-sphere" => [0.0915379, 0.0833613, 0.017635, 0.447855, -0.291, 0.687612, 1.31916, 0.695357, 0.0940616],
         "3D-sphere" => [-0.00827322, -0.0546565, -0.00438196, 0.53397, -0.377591, 0.446063, -0.0336524, -0.0570324, -0.0110678],
-        "union"     => [-0.14102, -0.0149183, 0.00704117, 0.39624, -0.242721, 1.41382, 1.70377, 0.558954, 0.0511064])
+        "union"     => [-0.182866, -0.0351219, 0.00462202, 0.382929, -0.230043, 0.0644419, 0.234885, 0.0664019])
 end
 
 # compare across example types
-crossloss = [loss(test;p,smooth! = pseudo!) for (_,p) ∈ opt, (_,test) ∈ data]
+crossloss = [loss(test;p,smooth! = pseudo!,pmodels,jmodel) for (_,p) ∈ opt, (_,test) ∈ data]
 begin
     crossloss = [   -1.87665    1.16439   -1.13973   1.65732   -0.0803689   1.39344
                     -0.622401  -1.8119    -0.56231   0.28911   -0.428983   -0.261036
@@ -56,12 +62,6 @@ begin
             xaxis=("train",names(opt),60),yaxis=("test",names(data),:flip)))
 end
 savefig("crossloss.png")
-
-# function lerp(x,y)
-#     i = floor(Int,x); dx = x-i
-#     i+2>length(y) && return y[end]
-#     y[i+2]*dx+y[i+1]*(1-dx)
-# end
 
 using GeometricMultigrid: mg, @loop
 data = create_synthetic(len=1)
