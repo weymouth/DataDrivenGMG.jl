@@ -26,8 +26,7 @@ end
 end
 
 # Parameterized approximate inverse matrix P
-# p₀ = Float32[-0.182866, -0.0351219, 0.00462202, 0.382929, -0.230043, 0.0644419, 0.234885, 0.0664019] # result from tune_synthetic
-p₀ = zeros(Float32,12) # result from tune_synthetic
+p₀ = Float32[-0.0162363, 0.0304057, 0.0112845, 0.0812823, 0.0784739, -0.00240444, 0.00291828, 0.0062895] # result from tune_synthetic
 function PseudoInv(A::FieldMatrix; scale=maximum(A.L),p::AbstractVector{T}=p₀,
     pmodels=p->(D->1+p[1]+D*(p[2]+D*p[3]),L->L*(p[4]+L*p[5])),kw...) where T
 

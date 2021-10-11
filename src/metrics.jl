@@ -13,4 +13,4 @@ loss(data;p=p₀,kw...) = sum(Δresid(state(d...;p,kw...);p,kw...) for d ∈ dat
 # optimize parameters to minimize loss
 fit(data,p₀=zeros(Float32,5);smooth! = pseudo!,kw...) = Optim.minimizer(
     optimize(p->loss(data;p,smooth!,kw...),p₀, Newton(),
-    Optim.Options(time_limit=60,show_trace=true,f_tol=1e-4); autodiff = :forward))
+    Optim.Options(time_limit=120,show_trace=true,f_tol=1e-4); autodiff = :forward))
