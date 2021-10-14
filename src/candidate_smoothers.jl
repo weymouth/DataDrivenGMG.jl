@@ -20,8 +20,8 @@ end
     end
     increment!(st;kw...)
 end
-@fastmath function Jacobi!(st;kw...)
-    @loop st.ϵ[I] = st.r[I]*st.iD[I] # hacked by TunedJacobi!
+@fastmath Jacobi!(st;inner=1,kw...) = for _ ∈ 1:inner
+    @loop st.ϵ[I] = st.r[I]*st.iD[I]
     increment!(st;kw...)
 end
 
@@ -43,11 +43,6 @@ function PseudoInv(A::FieldMatrix; scale=maximum(A.L),p::AbstractVector{T}=p₀,
     end
     FieldMatrix(L,D,A.R)
 end
-function TunedJacobi!(iD::FieldVector{T},A::FieldMatrix; scale=maximum(A.L),p::AbstractVector{T}=p₀,
-    jmodel=p->(D->1+p[6]+D*(p[7]+D*p[8])),kw...) where T
-    Dm = jmodel(p)
-    @loop iD[I] = (abs(A.D[I])<1e-8) ? 0. : inv(A.D[I])*Dm(A.D[I]/scale)
-end
 
 # Create MG state with st.P
 function state(A,x,b;p=p₀,xT::Type=eltype(p),smooth! =GS!,kw...)
@@ -62,15 +57,21 @@ end
 state(A,b;kw...) = state(A,zero(b),b;kw...)
 fill_pseudo!(st;kw...) = fill_pseudo!(st,st.child;kw...)
 fill_pseudo!(st,child;kw...) = (fill_pseudo!(st,nothing;kw...);fill_pseudo!(child;kw...))
-fill_pseudo!(st,::Nothing;kw...) = (st.P=PseudoInv(st.A;kw...); TunedJacobi!(st.iD,st.A;kw...))
+fill_pseudo!(st,::Nothing;kw...) = (st.P=PseudoInv(st.A;kw...))
 
 # Apply smoother
-pseudo!(st;kw...) = pseudo!(st,st.P;kw...)
-pseudo!(st,nothing;kw...) = nothing # Can't use pseudo! without st.P
+@inline pseudo!(st;kw...) = pseudo!(st,st.P;kw...)
 @fastmath pseudo!(st,P::FieldMatrix;inner=2,kw...) = for _=1:inner
     @loop st.ϵ[I] = mult(I,P.L,P.D,st.r)
     increment!(st)
 end
+# @inline precond!(st;kw...) = Jacobi!(st;kw...)
+# @inline precond!(st;kw...) = precond!(st,st.P;kw...)
+# @fastmath function precond!(st,P::FieldMatrix;kw...)
+#     @loop st.ϵ[I] = st.r[I]*P.D[I] # pseudo
+#     increment!(st;kw...)
+# end
+@inline precond!(st;kw...) = pseudo!(st;inner=1,kw...)
 
 # # uniform 5-point stencil: loss ≈ -0.7, @btime(n=32)≈3.1μs
 # smooth!(st,θ::AbstractVector;kw...) = smooth!(st,θ...;kw...)
