@@ -10,6 +10,7 @@
 \usepackage{caption}
 \usepackage{subcaption}
 \usepackage{amsmath}
+\usepackage{svg}
 %%%%%%%%%%%%%%%%%%%%%%%
 
 \begin{document}
@@ -41,7 +42,8 @@ Pressure projection is a bottleneck in high-speed unsteady incompressible flow s
 Recent advances in data-driven acceleration of flow solvers have mainly focused on data-assimilation methods and data-driven turbulence closures. Data-assimilation methods typically avoid the expensive pressure projection step entirely, focusing on applications where time-accurate pressure forces are not important \cite{asch2016data}. Deep learning closures for Large Eddy Simulation (LES) \cite{BECK2019108910,maulik_san_rasheed_vedula_2019}, Unsteady Reynolds Averaged Navier-Stokes (unRANS) \cite{ling_kurzawski_templeton_2016}, and even Spanwise Averaged Navier-Stokes (SANS) \cite{font2021deep} simulations have seen growing success and are capable of accurate force prediction. However, none of these examples have accelerated the project step itself.
 
 \begin{figure}
-    \caption{Sketch of a Convolutional Neural Networks (CNN) and/or a Multi-grid V-cycle.}
+    \includesvg{figures/drawing}
+    \caption{Sketch of a Convolutional Neural Networks (CNN) encoder/decoder and/or a Multi-grid V-cycle.}
     \label{fig:multigrid}
 \end{figure}
 
