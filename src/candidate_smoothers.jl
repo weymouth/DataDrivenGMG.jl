@@ -11,7 +11,7 @@ using GeometricMultigrid: multL, multU, mult, increment!, δ
     end
     increment!(st;kw...)
 end
-@fastmath function SOR!(st;inner=3,ω=1.15,kw...)
+@fastmath function SOR!(st;inner=3,ω=0.9,kw...)
     @inbounds for I ∈ st.iD.R  # optimized first iteration
         st.ϵ[I] = ω*st.iD[I]*(st.r[I]-multL(I,st.A.L,st.ϵ))
      end
@@ -26,9 +26,9 @@ end
 end
 
 # Parameterized approximate inverse matrix P
-p₀ = Float32[-0.0162363, 0.0304057, 0.0112845, 0.0812823, 0.0784739, -0.00240444, 0.00291828, 0.0062895] # result from tune_synthetic
+p₀ = Float32[-0.191646, -0.0427722, 0.00370673, -0.161197, -0.10299] # result from tune_synthetic
 function PseudoInv(A::FieldMatrix; scale=maximum(A.L),p::AbstractVector{T}=p₀,
-    pmodels=p->(D->1+p[1]+D*(p[2]+D*p[3]),L->L*(p[4]+L*p[5])),kw...) where T
+    pmodels=p->(D->1+p[1]+D*(p[2]+D*p[3]),L->L*(p[4]*(L-2)+p[5]*(L-1))),kw...) where T
 
     L,D,N = zeros(T,size(A.L)),zeros(T,size(A.D)),length(size(A.D))
     Dm,Lm = pmodels(p)
@@ -65,12 +65,11 @@ fill_pseudo!(st,::Nothing;kw...) = (st.P=PseudoInv(st.A;kw...))
     @loop st.ϵ[I] = mult(I,P.L,P.D,st.r)
     increment!(st)
 end
-# @inline precond!(st;kw...) = Jacobi!(st;kw...)
-# @inline precond!(st;kw...) = precond!(st,st.P;kw...)
-# @fastmath function precond!(st,P::FieldMatrix;kw...)
-#     @loop st.ϵ[I] = st.r[I]*P.D[I] # pseudo
-#     increment!(st;kw...)
-# end
+@inline tunedJ!(st;kw...) = tunedJ!(st,st.P;kw...)
+@fastmath function tunedJ!(st,P::FieldMatrix;kw...)
+    @loop st.ϵ[I] = st.r[I]*P.D[I] # pseudo
+    increment!(st;kw...)
+end
 @inline precond!(st;kw...) = pseudo!(st;inner=1,kw...)
 
 # # uniform 5-point stencil: loss ≈ -0.7, @btime(n=32)≈3.1μs

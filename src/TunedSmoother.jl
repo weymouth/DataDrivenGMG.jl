@@ -1,7 +1,7 @@
 module TunedSmoother
 
 include("candidate_smoothers.jl")
-export Jacobi!,GS!,SOR!,pseudo!,state,precond!
+export Jacobi!,GS!,SOR!,pseudo!,state,precond!,tunedJ!
 
 include("create_synthetic.jl")
 export create_synthetic
