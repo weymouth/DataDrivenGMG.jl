@@ -1,13 +1,16 @@
-using GeometricMultigrid: mg!
+using GeometricMultigrid: mg!,Vcycle!,norm
 using Optim
 
 # count average V-cycles to get reltol 1e-3
-itcount(d,s;kw...) = mg!(state(d...;smooth! = s,kw...);reltol=1e-3,smooth! = s, mxiter=32, kw...)
+itcount(d,s;kw...) = mg!(state(d...;smooth! = s,kw...);reltol=1e-3,abstol=0,smooth! = s, mxiter=32, kw...)
 avecount(data,s;kw...) = sum(itcount(d,s;kw...) for d ∈ data)/length(data)
 
 # measure average residual reduction after it V-cycles
-Δresid(st;it=1,kw...) = (resid = mg!(st;mxiter=it,log=true,kw...);
-                        log10(resid[end]/resid[1])/it)
+function Δresid(st;it=1,kw...)
+    r₀ = norm(st.r)
+    for _ in 1:it; Vcycle!(st;kw...); end
+    return log10(norm(st.r)/r₀/it)
+end
 loss(data;p=p₀,kw...) = sum(Δresid(state(d...;p,kw...);p,kw...) for d ∈ data)/length(data)
 
 # optimize parameters to minimize loss
