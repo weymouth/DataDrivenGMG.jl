@@ -15,15 +15,15 @@ begin # run benchmarks and count iterations
     time_factor = times[2:end,:]./times[1,:]'
 end
 
-counts = [avecount(d,pseudo!;p) for (_,d) ∈ data]
+counts = [avecount(d,s;p=TunedSmoother.p₀) for s ∈ smoothers[2:end], (_,d) ∈ data]
 
 begin # results from block above
     time_factor = [ 3.50716   2.72302   3.5       2.73946   3.51437   2.71142
-                    4.75072   3.24036   4.74      3.21826   4.76437   3.19066
+                    3.19072   3.12036   3.19      3.12826   3.1877    3.13066
                     1.37096   1.56152   1.36767   1.54179   1.36671   1.54011]
-    counts = [  3.0  4.0  1.5   1.17  3.98  3.55
-                4.0  3.0  1.55  1.16  3.96  3.0
-                2.5  3.0  1.00  1.04  3.18  3.0]
+    counts = [  3.0  4.0  1.58  2.04  3.0  3.0
+                4.0  3.0  1.7   2.05  3.0  3.9
+                3.0  3.0  1.57  2.04  3.16  3.0]
     rel_time = counts.*time_factor
     accel = rel_time[1:2,:]./rel_time[3,:]' # speed up!!
 end
@@ -36,7 +36,7 @@ begin # plot
     ctg = CategoricalArray(repeat(cats,inner=n))
     levels!(ctg,cats)
     groupedbar((counts.*time_factor)',size=(400,350),
-                group=ctg,c=colors,
+                group=ctg,c=colors,legend=:bottomright, 
                 yaxis=("relative time"),
                 xaxis=("cases",(1:n,keys(data)),60))
 end
