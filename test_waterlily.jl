@@ -70,8 +70,8 @@ begin
     gauss_time /= jacobi_time
     sor_time /= jacobi_time
     pseudo_time /= jacobi_time
+    # gauss_time = 3.5; sor_time = 3.2; pseudo_time = 1.37
 end
-gauss_time = 3.5; sor_time = 3.2; pseudo_time = 1.37
 
 # Count the number of cycles needed
 crosscount = [[avecount(d,GS!) for (_,d) ∈ data]'.*gauss_time
@@ -128,9 +128,8 @@ end
 
 begin
     using GeometricMultigrid: Vcycle!
-    # for (name,h) in ((circle,160),(wing,300),(shark,160))
+    for (name,h) in ((circle,160),(wing,300),(shark,160))
     # for (name,h) in ((TGV,300),)
-    for (name,h) in ((wing,300),)
     # for (name,h) in ((donut,160),)
             smooth! = pseudo!
         # st = state(data[name][25]...;smooth!)
@@ -152,3 +151,19 @@ begin
         savefig(string(name)*"triple.png")
     end
 end
+begin
+    name = shark
+    anim = @animate for d in data[name]
+        st = state(d...)
+        x = copy(st.x.data)
+        x .-= st.x[1]
+        x[st.A.D .> -1.5] .= NaN
+        r = copy(st.r)
+        f(x) = @. log10(clamp(abs(x),1e-6,Inf64))
+        plot(heatmap(x[st.x.R]', legend=false, c=:bluesreds, clims=(-1,1)),
+             heatmap(f(r.data[st.x.R]'), legend=false, c=:Reds, clims=(-6,-1)),
+             layout=(1,2), size=(1000,250), axis=nothing)
+    end
+    gif(anim,string(name)*".gif")
+end
+
