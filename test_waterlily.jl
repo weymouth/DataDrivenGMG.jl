@@ -73,22 +73,22 @@ begin
 end
 
 begin
-    scaledata = make_data(p=4)
-    scaledata[wing] = filter(d->itcount(d;smooth! =GS!)<32,scaledata[wing])
+    scaledata = create_waterlily(p=4)
+    scaledata[wing] = filter(d->itcount(d,GS!)<32,scaledata[wing])
     opt2 = OrderedDict(name=>fit(train;it=2) for (name,train) ∈ scaledata)
 end
 begin
     opt2 = OrderedDict(
-        circle => [0.412175, 0.288861, 0.0510388, 0.72032, -0.554927],
-        TGV    => [-0.447214, -0.169634, -0.00902928, 0.349716, -0.2018],
-        donut  => [0.162644, 0.0423348, 0.00964613, 0.347914, -0.198642],
-        wing   => [-0.433754, -0.436679, -0.0765471, 0.703688, -0.523553],
-        shark  => [0.124323, -0.063333, -0.0169111, 0.660478, -0.474286])
+        circle => [0.143874, 0.114321, 0.024359, -0.166979, -0.211477],
+        TGV    => [-0.445326, -0.175383, -0.0100868, -0.147759, 0.0],
+        donut  => [0.120699, 0.0239083, 0.00775287, -0.149375, -0.0753296],
+        wing   => [0.0259308, -0.123091, -0.0268147, -0.174569, -0.542901],
+        shark  => [0.0673034, -0.104414, -0.0241938, -0.182964, -0.298915]
+    )
 end
 
 # time a single Vcycle
 begin
-    using 
     temp!(st;kw...) = mg!(st;inner=2,mxiter=1,kw...)
     jacobi_time = @belapsed temp!(st;smooth! = Jacobi!) setup=(st=state($data[shark][1]...)) #
     gauss_time = @belapsed temp!(st;smooth! = GS!) setup=(st=state($data[shark][1]...)) #
@@ -98,16 +98,18 @@ begin
     sor_time /= jacobi_time
     pseudo_time /= jacobi_time
 end
+gauss_time = 3.5; sor_time = 3.2; pseudo_time = 1.37
 
 # Count the number of cycles needed
-crosscount = [[avecount(d;smooth! = GS!) for (_,d) ∈ data]'.*gauss_time
-              [avecount(d;smooth! = SOR!) for (_,d) ∈ data]'.*sor_time
-              [avecount(d) for (_,d) ∈ data]'.*pseudo_time
-              [avecount(d;p=opt2[name]) for (name,d) ∈ data]'.*pseudo_time]
-crosscount=[ 6.35661  6.3778   6.35661  11.5915   13.4125
-             6.62809  6.71706  6.71706  12.6037   14.7464
-             2.71573  3.44818  3.63975   8.7055    8.643
-             2.29879  2.37767  3.3693    7.9101    7.94435]
+crosscount = [[avecount(d,GS!) for (_,d) ∈ data]'.*gauss_time
+              [avecount(d,SOR!) for (_,d) ∈ data]'.*sor_time
+              [avecount(d,pseudo!) for (_,d) ∈ data]'.*pseudo_time
+              [avecount(d,pseudo!;p=opt2[name]) for (name,d) ∈ data]'.*pseudo_time]
+crosscount = [  7.0   7.56    10.5     18.585   20.825
+                6.4   9.632    9.632   17.92    20.128
+                2.74  4.11     4.1511   8.7954  10.1106
+                2.74  2.8907   4.0963   8.2063   9.453
+            ]
 
 begin
     using StatsPlots,CategoricalArrays
@@ -127,8 +129,9 @@ begin
     using GeometricMultigrid: Vcycle!
     # for (name,h) in ((circle,160),(wing,300),(shark,160))
     # for (name,h) in ((TGV,300),)
-    for (name,h) in ((donut,160),)
-        smooth! = pseudo!
+    for (name,h) in ((wing,300),)
+    # for (name,h) in ((donut,160),)
+            smooth! = pseudo!
         # st = state(data[name][25]...;smooth!)
         st = state(data[name][end]...;smooth!)
         x = copy(st.x.data)
@@ -137,13 +140,13 @@ begin
         r = copy(st.r)
         f(x) = @. log10(clamp(abs(x),1e-6,Inf64))
         Vcycle!(st;smooth!)
-        # plot(heatmap(x[st.x.R]',legend=false,clims=(-1,1)),
-        # heatmap(f(r.data[st.x.R]'),legend=false,c=:Reds,clims=(-6,-1)),
-        # heatmap(f(st.r.data[st.x.R]'),legend=false,c=:Reds,clims=(-6,-1)),
-        plot(heatmap(x[st.x.R[:,:,end÷4]]',legend=false,clims=(-1,1)),
+        plot(heatmap(x[st.x.R]',legend=false,clims=(-1,1)),
+        heatmap(f(r.data[st.x.R]'),legend=false,c=:Reds,clims=(-6,-1)),
+        heatmap(f(st.r.data[st.x.R]'),legend=false,c=:Reds,clims=(-6,-1)),
+        # plot(heatmap(x[st.x.R[:,:,end÷4]]',legend=false,clims=(-1,1)),
         # plot(heatmap(x[st.x.R[:,:,end÷4]]',legend=false),
-        heatmap(f(r.data[st.x.R[:,:,end÷4]]'),legend=false,c=:Reds,clims=(-6,-1)),
-        heatmap(f(st.r.data[st.x.R[:,:,end÷4]]'),legend=false,c=:Reds,clims=(-6,-1)),
+        # heatmap(f(r.data[st.x.R[:,:,end÷4]]'),legend=false,c=:Reds,clims=(-6,-1)),
+        # heatmap(f(st.r.data[st.x.R[:,:,end÷4]]'),legend=false,c=:Reds,clims=(-6,-1)),
         layout = (1,3),size=(900,h),axis=nothing)
         savefig(string(name)*"triple.png")
     end
