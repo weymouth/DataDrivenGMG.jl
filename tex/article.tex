@@ -42,8 +42,8 @@ Recent advances in data-driven acceleration of flow solvers have mainly focused 
 
 \begin{figure}
     \centering
-    \includegraphics[width=0.5\textwidth]{figures/drawing}
-    \caption{Sketch of a Convolutional Neural Networks (CNN) encoder/decoder and/or a Multi-grid V-cycle.}
+    \includegraphics[width=0.8\textwidth]{figures/drawing}
+    \caption{Sketch of a Convolutional Neural Networks (CNN) encoder/decoder and/or a Multi-grid V-cycle. Data is restricted down to a reduced size for faster solving before being pushed back up to the full size. A single reduction is shown, but this process repeats recursively.}
     \label{fig:multigrid}
 \end{figure}
 
@@ -82,9 +82,11 @@ The restriction-solve-prolongation process, a V-cycle, distributes the residual 
 
 As \textit{any} element of the residual of the elliptic Poisson system potentially influences \textit{every} element of the update, $O(N\log N)$ is the best possible solution time scaling. However, data-driven methods can still be used to accelerate pressure projection by speeding-up and increasing the residual reduction of each V-cycle iteration.
 
-The linearity of equation \ref{eq:aer} is a critical property which the data-driven method must maintain. Not only will this increase generality, but a nonlinear method could not be used iteratively since the modes of the residual will change as the solver converges. However, this linearity is only with respect to the update and residual fields. The operators of the MG method can all potentially be made into parameterized nonlinear functions of $A$, embedding information about the discrete problem and boundary conditions. 
+The linearity of equation \ref{eq:aer} is a critical property which the data-driven method must maintain. Consider that the modes of the residual will change as the solver converges for even a single project case, meaning that a nonlinear method could not be applied iteratively. However, this linearity is only with respect to the update and residual fields. The operators of the MG method can all potentially be made into parameterized nonlinear functions of $A$, embedding information about the discrete problem and boundary conditions. 
 
-Which MG operation is the best candidate for such an approach? The prolongation operator (and its transpose restriction operator) is not inherently a function of $A$, and while related super-resolution operators have seen use in the literature, these are nonlinear functions of the field. The precondition operator is an option, but a simple Jacobi preconditioner
+Which MG operation is the best candidate for such an approach? There is certainly scope for optimization in the prolongation operator (and its transpose restriction operator) in algebraic multi-grid methods. 
+
+is not inherently a function of $A$, and while related super-resolution operators have seen use in the literature, these are nonlinear functions of the field. The precondition operator is an option, but a simple Jacobi preconditioner
 \begin{equation}
     \epsilon = D^{-1}r
 \end{equation}
@@ -103,7 +105,7 @@ There are few constraints on $\tilde A^{-1}$: it must have units of $A^{-1}$, an
     \tilde a^{-1}_{ii} = \frac{f_d(a_{ii}/s\,|\theta_d)}{a_{ii}} , \quad
     \tilde a^{-1}_{ij} = \frac{f_o(a_{ij}/s\,|\theta_o)}{a_{ii}+a_{jj}}
 \end{equation}
-where function inputs are scaled by the maximum off-diagonal $s=\max(A-D)$ and the outputs are scaled by the diagonal elements. Note a Jacobi smoother would use a diagonal function $f_d=1$ and off-diagonal function $f_o=0$. With the learning problem now reduced to two normalized single-variable functions, the specific choice of parameterization is not critical and a simple quadratic polynomial $f(a) = \sum_{p=0}^2 a^p \theta_p$ is chosen for $f_o$ and $f_d$. Using higher-order polynomials, splines, and interpolating kernels did not significantly change the results.
+where function inputs are scaled by the maximum off-diagonal $s=\max(A-D)$ and the outputs are scaled by the diagonal elements. Note a Jacobi smoother would use a diagonal function $f_d=1$ and off-diagonal function $f_o=0$ and that $f_0(0)=0$ is required to maintain the sparsity of $\tilde A^{-1}$. With the learning problem now reduced to two normalized single-variable functions, the specific choice of parameterization is not critical and a simple cubic is chosen for $f_d$ and $f_o$. Using higher-order polynomials, splines, and interpolating kernels did not significantly change the results.
 
 The parameterized smoother is optimized for a set of training data $X=\{A,x^k,b\}$. The loss function is simply the reduction in the norm of the residual after a V-cycle iteration $L = \log_{10}(|r^{k+1}| / |r^{k}|)$, which means that example pressure \textit{solutions} are not required. This loss is averaged over each iteration and each example in the data-set. The optimal parameters are defined as
 \begin{equation}
@@ -163,46 +165,37 @@ Neumann boundary conditions are applied on all boundaries, including the boundar
 
 Figure~\ref{fig:cross plot} characterizes the generalization of the parameterized smoother's residual reduction over a single V-cycle on 100 randomized `test' case examples after optimization using 100 examples of the `train' case. Each example uses a grid size of $n=32^M$ points ($N=32^2$ in 2D and $N=32^3$ in 3D) as testing with other resolutions found essentially no change in the performance. Two inner loops are used throughout to optimize residual reduction. As expected, the performance is best when testing and training on the same case, with a single V-cycle reducing the residual from $10^{-1.17}$ on the 2D-sphere case down to $10^{-1.58}$ on the 3D-box case. While the performance for the simplest cases generalizes poorly, the 2D-sphere smoother generalizes essentially as well as the `union' smoother trained on all of the data. 
 
-Finally, the acceleration of the `union' data-driven smoother is evaluated on new example data of a different size, $n=64^M$ points. Figure~\ref{fig:synthetic time} shows the time to reduce the residual of each case by $10^{-3}$ relative to the time to run a single V-cycle using a Jacobi smoother. While a Jacobi smoother requires  hundreds or even thousands of V-cycles to converge, the Jacobi-like parameterized smoother is only around 30-50\% slower per V-cycle, and yet converges in only 1-3 V-cycles in all cases. This results in a 80-174\% speed-up (mean: 119\%) relative to optimized serial Gauss-Sidel and SOR smoothers. This speed-up will be even more favorable in parallel computation as the new smoother operates directly on the local residual without back-propagation, eliminating any additional communication.
+Finally, the acceleration of the `union' data-driven smoother is evaluated on new example data of a different size, $n=64^M$ points. Figure~\ref{fig:synthetic time} shows the time to reduce the residual of each case by $10^{-3}$ relative to the time to run a single V-cycle using a Jacobi smoother. The Jacobi smoother is not sufficient to solve even these simple synthetic problems rapidly, requiring many hundreds o V-cycles. Yet, the Jacobi-like parameterized smoother is only around 30-50\% slower per V-cycle, and converges in only 1-3 V-cycles in all cases. This results in a 80-210\% speed-up (mean: 133\%) relative to optimized serial Gauss-Sidel and SOR smoothers. This speed-up will be even more favorable in parallel computation as the new smoother operates directly on the local residual without back-propagation, eliminating any additional communication.
 
 \begin{figure}
     \centering
-    \begin{subfigure}[b]{0.3\textwidth}
-        \centering
-        \caption{circle flow}
-        \label{fig:circle}
+    \begin{subfigure}[a]{\textwidth}
+        \centering 
+        \includegraphics[width=\textwidth]{figures/circletriple.png}
+        \caption[-1mm]{Circle flow}
     \end{subfigure}
-    \begin{subfigure}[b]{0.3\textwidth}
+    \begin{subfigure}[b]{\textwidth}
         \centering
-        \caption{Taylor-Green Vortex}
-        \label{fig:TGV}
+        \includegraphics[width=\textwidth]{figures/donuttriple.png}
+        \caption{Torus flow (slice)}
     \end{subfigure}
-    \begin{subfigure}[b]{0.3\textwidth}
+    \begin{subfigure}[c]{0.6\textwidth}
         \centering
-        \caption{flapping wing}
-        \label{fig:wing}
+        \includegraphics[width=\textwidth]{figures/TGVtriple.png}
+        \caption{Taylor-Green Vortex (slice)}
     \end{subfigure}
-    % \begin{minipage}{0.47\textwidth}
-        \begin{subfigure}{0.47\textwidth}
+    \begin{subfigure}[c]{0.6\textwidth}
         \centering
-        \caption{torus flow}
-        \label{fig:donut}
-        \end{subfigure}
-        \hfill
-        \begin{subfigure}{0.47\textwidth}
+        \includegraphics[width=\textwidth]{figures/wingtriple.png}
+        \caption{Flapping wing}
+    \end{subfigure}
+    \begin{subfigure}[b]{\textwidth}
         \centering
-        \caption{swimming shark}
-        \label{fig:shark}
-        \end{subfigure}
-    % \end{minipage}
+        \includegraphics[width=\textwidth]{figures/sharktriple.png}
+        \caption{Swimming shark}
+    \end{subfigure}
     \hfill
-    % \begin{subfigure}[b]{0.47\textwidth}
-    %     \centering
-    %     \includegraphics[width=\textwidth]{figures/compareloss.png}
-    %     \caption{single-cycle residual reduction}
-    %     \label{fig:simulation residual}
-    % \end{subfigure}
-    \caption{(a-e) Snapshots from the five flow simulation cases. The Taylor-Green Vortex and torus flow are 3D, the flapping wing is dynamic without a background flow and the swimming shark is a deforming geometry.}
+    \caption{Snapshots from the five flow simulation cases showing the pressure solution (left), the initial residual (middle), and the residual after a single V-cycle (right). The Taylor-Green Vortex and torus flow are 3D, the flapping wing is dynamic without a background flow and the swimming shark is a deforming geometry. All residuals are visualized using $\log_{10}\text{abs}(r)$ on the same scale, $10^{-6} \ldots 10^{-1}$.}
     \label{fig:simulation cases}
 \end{figure}
 
@@ -250,13 +243,13 @@ The relative speed-up of this approach is compared to classic MG methods and the
         \label{fig:tuned inverse}
 \end{figure}
 
-Finally, the parameterized $f_d,\,f_o$ functions used in the approximate inverse equation \ref{eq:approxinv} are shown in Figure \ref{fig:tuned inverse}. It is interesting to note that the diagonal functions are all somewhat centered on one and the off-diagonal values all have an essentially zero intercept as these are the values for the Jacobi smoother. We also note that the `wing' and `shark' cases produce parameterizations which are similar to each other but significantly different than the others cases. This is reasonable as dynamic and deforming geometries put unique burdens on the pressure projection step, as shown in the longer convergence times for these cases shown in Figure \ref{fig:simulation time}. Adopting a data-driven and auto-tuned approach enables these pressure-projection dominated cases to achieve significant accelerations.
+Finally, the parameterized $f_d,\,f_o$ functions used in the approximate inverse equation \ref{eq:approxinv} are shown in Figure \ref{fig:tuned inverse}. It is interesting to note that the diagonal functions are all somewhat centered on one, the value for the Jacobi smoother. We also note that the `wing' and `shark' cases produce parameterizations which are similar to each other but significantly different than the others cases. This is reasonable as dynamic and deforming geometries put unique burdens on the pressure projection step, as shown in the longer convergence times for these cases shown in Figure \ref{fig:simulation time}. Adopting a data-driven and auto-tuned approach enables these pressure-projection dominated cases to achieve significant accelerations.
 
 \section{Conclusions}
 
 This manuscript develops a successful data-driven method to accelerate the solution of discrete pressure Poisson systems found in incompressible flow simulations. Multi-grid methods are identified as linear convolutional encoder-decoder networks with optimal ($N\log N$) scaling, and the matrix coefficients are identified as the critical nonlinear input, not the projection source-term, embedding information such as boundary conditions. Mathematical constraints are used to further focus the learning capacity to a parameterized Jacobi-like Multi-grid smoother. This resulting data-driven MG solver is with 33\% of the minimum computational cost per V-cycle, and shown to outperform classic Gauss-Sidel and SOR smoothers by 66-185\% on eleven simulation cases. Because of the focused learning capacity, the generalization is excellent, enabling 90\% effective transfer learning from a synthetic data-set and essentially perfect transfer from reduced resolution simulations. 
 
-The potential of machine learning and computer science advances to improve fluid dynamics is vast, but well-applied classical methods and constraints only helps to focus this effort. Wherever possible, this work has made the simplest choice in parameterization, leaving significant opportunities for future improvements. Many other flow solvers and linear systems are yet to be explored, and extensions to this basic data-driven approach could accelerate solutions for a wide array of discrete partial differential equations. 
+The potential of machine learning advances to improve fluid dynamics is vast, but well-applied classical methods and constraints are needed to focus this potential. Wherever possible, this work has made the simplest choice in parameterization, leaving significant opportunities for future improvements. Many other flow solvers and linear systems are yet to be explored, and extensions to this basic data-driven approach could accelerate solutions for a wide array of discrete partial differential equations. 
 
 
 \bibliography{mybibfile}
