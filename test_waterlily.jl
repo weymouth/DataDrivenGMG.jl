@@ -45,33 +45,6 @@ begin
 end
 savefig("scaleloss.png")
 
-# plot best pseudo-inverse functions across examples
-begin
-    using Plots
-    models=p->(D->1+p[1]+D*(p[2]+D*p[3]),L->L*(p[4]+L*p[5]))
-    a,_ = models(p₀)
-    plot(-6:0.1:0,a,label="transfer",size=(400,400),
-         xaxis=("aᵢᵢ"),yaxis=("fᵢᵢ"),legend=:bottomleft)
-    for (name,p) in opt
-        x = name ∈ (TGV,donut) ? (-6:0.1:0) : (-4:0.1:0)
-        a,_ = models(p)
-        plot!(x,a,label=name)
-    end
-    display(plot!(-6:0,i->1,label="jacobi",c=:grey))
-    savefig("diag_fun.png")
-
-    x = 0:0.02:1
-    _,a = models(p₀)
-    plot(x,a,label="transfer",size=(400,400),
-         xaxis=("aᵢⱼ"),yaxis=("fᵢⱼ"),legend=:bottomright)
-    for (name,p) in opt
-        _,a = models(p)
-        plot!(x,a,label=name)
-    end
-    display(plot!(x,i->0,label="jacobi",c=:grey))
-    savefig("lower_fun.png")
-end
-
 begin
     scaledata = create_waterlily(p=4)
     scaledata[wing] = filter(d->itcount(d,GS!)<32,scaledata[wing])
@@ -124,6 +97,34 @@ begin
                 xaxis=("cases",(1:length(data),keys(data))),)
 end
 savefig("crosscount.png")
+
+# plot best pseudo-inverse functions across examples
+begin
+    using Plots
+    p₀ = Float32[-0.104447, -0.00238399, 0.00841367, -0.158046, -0.115103]
+    pmodels(p) = (D->1+p[1]+D*(p[2]+D*p[3]),L->L*(p[4]*(L-2)+p[5]*(L-1)))
+    a,_ = pmodels(p₀)
+    plot(-6:0.1:0,a,label="transfer",size=(400,400),
+         xaxis=("aᵢᵢ"),yaxis=("fᵢᵢ"),legend=:bottomleft)
+    for (name,p) in opt2
+        x = name ∈ (TGV,donut) ? (-6:0.1:0) : (-4:0.1:0)
+        a,_ = pmodels(p)
+        plot!(x,a,label=name)
+    end
+    display(plot!(-6:0,i->1,label="jacobi",c=:grey))
+    savefig("diag_fun.png")
+
+    x = 0:0.02:1
+    _,a = pmodels(p₀)
+    plot(x,a,label="transfer",size=(400,400),
+         xaxis=("aᵢⱼ"),yaxis=("fᵢⱼ"),legend=:bottomright)
+    for (name,p) in opt2
+        _,a = pmodels(p)
+        plot!(x,a,label=name)
+    end
+    display(plot!(x,i->0,label="jacobi",c=:grey))
+    savefig("lower_fun.png")
+end
 
 begin
     using GeometricMultigrid: Vcycle!
