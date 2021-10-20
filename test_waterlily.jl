@@ -6,14 +6,15 @@ data = create_waterlily()
 # Optimize the psuedo-inverse functions
 begin # this block takes around 30 minutes. the next block has the results
     smooth! = pseudo!
+    scaleloss = zeros(Float32,6,length(data))
+    scaleloss[1,:] .= [loss(test;p=zeros(Float32,5),smooth!) for (name,test) ∈ data]
+    scaleloss[2,:] .= [loss(test;p=p₀,smooth!) for (name,test) ∈ data]
     opt = OrderedDict(name=>p₀ for name ∈ keys(data))
-    scaleloss = zeros(5,length(opt))
-    scaleloss[1,:] .= [loss(test;p=p₀,smooth!) for (name,test) ∈ data]
     for scale ∈ 1:4
         @show scale
         scaledata = scale==4 ? data : create_waterlily(p=scale+2,cases=keys(data))
         opt = OrderedDict(name=>fit(train,opt[name]) for (name,train) ∈ scaledata)
-        scaleloss[scale+1,:] .= [loss(test;p=opt[name],smooth!) for (name,test) ∈ data]
+        scaleloss[scale+2,:] .= [loss(test;p=opt[name],smooth!) for (name,test) ∈ data]
     end
 end
 
@@ -25,21 +26,22 @@ begin # output from the block above
         wing   => [-0.229121, -0.253223, -0.042952, 0.782714, -0.604938, -0.00708945, 0.0287928, 0.00663962],
         shark  => [-0.279771, -0.281626, -0.0476559, 0.821296, -0.649919, -0.00109436, 0.055443, 0.00988565])
 
-    scaleloss= [-1.75374  -1.52343  -1.48713  -1.37156  -1.45274
+    scaleloss= [-0.46811  -0.63303  -0.64559  -0.52364  -0.58142
+                -1.75374  -1.52343  -1.48713  -1.37156  -1.45274
                 -1.7893   -1.69872  -1.63804  -1.42732  -1.46177
-                -1.81289  -1.73545  -1.64428  -1.42765  -1.46817
-                -1.80914  -1.73749  -1.65463  -1.43041  -1.48582
+                -1.81289  -1.73545  -1.64428  -1.42765  -1.48817
+                -1.80914  -1.73749  -1.65463  -1.43041  -1.49582
                 -1.82367  -1.73825  -1.65887  -1.4328   -1.50249]
 end
 
 # plot loss across examples and scales
 begin
     using StatsPlots,CategoricalArrays
-    cats = ["transfer","⅛","¼","½","1"]
+    cats = ["Jacobi","transfer","⅛","¼","½","1"]
     ctg = CategoricalArray(repeat(cats,inner=length(data)))
     levels!(ctg,cats)
-    groupedbar(scaleloss', size = (400,400),
-                group=ctg, legend=:bottomright, palette=:Greens_5,
+    groupedbar(scaleloss', size = (420,400),
+                group=ctg, legend=:bottomright, palette=:Greens_6,
                 yaxis=("log₁₀ residual reduction",:flip),
                 xaxis=("cases",(1:length(data),keys(data))),)
 end
