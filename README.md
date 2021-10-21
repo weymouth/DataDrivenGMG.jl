@@ -1,4 +1,4 @@
-# TunedSmoother.jl
+# DataDrivenGMG.jl
 
 ![Swimming shark](figures/shark.gif)
 
