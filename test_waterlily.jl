@@ -50,16 +50,19 @@ savefig("scaleloss.png")
 begin
     scaledata = create_waterlily(p=4)
     scaledata[wing] = filter(d->itcount(d,GS!)<32,scaledata[wing])
-    opt2 = OrderedDict(name=>fit(train;it=2) for (name,train) ∈ scaledata)
+    opt2 = OrderedDict(name=>fit(train,p₀;it=2) for (name,train) ∈ scaledata)
 end
+
 begin
     opt2 = OrderedDict(
-        circle => [0.143874, 0.114321, 0.024359, -0.166979, -0.211477],
-        TGV    => [-0.445326, -0.175383, -0.0100868, -0.147759, 0.0],
-        donut  => [0.120699, 0.0239083, 0.00775287, -0.149375, -0.0753296],
-        wing   => [0.0259308, -0.123091, -0.0268147, -0.174569, -0.542901],
-        shark  => [0.0673034, -0.104414, -0.0241938, -0.182964, -0.298915]
+        circle => [0.143873, 0.114321, 0.0243589, -0.166979, -0.211476],
+        TGV    => [-0.445295, -0.175371, -0.0100856, -0.147759, 0.0],
+        donut  => [0.121331, 0.0259214, 0.00808, -0.149346, -0.0750463],
+        wing   => [0.0259344, -0.123088, -0.0268142, -0.174569, -0.542905],
+        shark  => [0.0673015, -0.104415, -0.024194, -0.182964, -0.298915]
     )
+    # c = [avecount(test,pseudo!;p=opt2[name]) for (name,test) ∈ data]
+    c = [2.0 2.11 2.99 5.99 6.9]
 end
 
 # time a single Vcycle
@@ -72,7 +75,6 @@ begin
     gauss_time /= jacobi_time
     sor_time /= jacobi_time
     pseudo_time /= jacobi_time
-    # gauss_time = 3.5; sor_time = 3.2; pseudo_time = 1.37
 end
 
 # Count the number of cycles needed
