@@ -1,0 +1,44 @@
+Thank you for taking the time to review this manuscript and identifying points of potential confusion. I have edited much of the text to clarify the goal of projection methods, the approach and test cases, and added a few figures. Please find a response to each comment below.
+
+1.      For publication in a computational fluids journal, the manuscript should provide at least a basic validation result. Without this, I have concern about the following in the manuscript:
+a.      The fact that the matrix A has a single zero eigenvalue means that the matrix is singular and without a unique solution. While the presented method is focusing on the accelerating the reduction of the residual, it is problematic for a pressure solver to have no unique solution. The author should discuss this issue and address how they resolve this issue in this work for the context of calculating pressure forces on boundaries and immersed bodies.
+b.      The author does not provide any comparison of force data for the unsteady incompressible simulation results where available data exists.
+
+1. The two results sections are extensive and direct validation studies for the new method. They document the ability of the solver to quickly reduce the velocity-divergence residual throughout the domain, which is the purpose of the pressure projection step. I have added substantial discussion throughout the text to help clarify this critical conceptual point. I have also added sample residual and normalized error plots to the synthetic cases in Figure 2 as it is always helpful to show representative large-scale features before jumping into ensemble metrics.
+a. The solution is unique up to an additive constant, which agrees with the derivative action of the pressure on the velocity-divergence. While it's certainly possible to add an additional condition to the matrix, this has no impact on the pressure projection or the measured forces.
+b. Comparing the predicted force against available data would be a validation of the nonlinear flow solver, not a validation of the linear projection method. I have included references to previous work validating the flow solver. Comparing pressure forces obtained from the different projection methods is a good sanity check, however, and this has been added as Figure XXX. As expected, the predicted forces are essentially identical for any solver that achieves the same residual reduction.
+
+2.      The manuscript does not provide details in the following areas making it unclear what is being done so that data can be reproduced:
+a.      The simulations in section 5 are done on grids with "different sizes and aspect ratios". This needs to be given in detail. How do these grids compare to production-level grids used for quantitative simulations? The domains appear to be "toy problems" and it would be helpful to know if the performance improvement has the possibility to translating into engineering domains.
+b.      The author does not address how the matrix A changes for the immersed boundary problem. The manuscript feels incomplete without incorporating a discussion of this information. Will this method work on any matrix A associated with immersed boundaries or just their specific implementation?
+c.      The non-static synthetic data cases are not motivated or described well. What does it mean to solve a 2D sphere in a quiescent fluid? Why is there no streamlined body case? Also, in looking at the solution of the 2D sphere case (Figure 2c) the Neumann boundary condition that is stated as being used in the text is not being honored by the solver (lower-left corner of the domain). Is this case different?
+
+2.
+a. I've added a new Appendix B with the numerical and physical parameters used for each test case. The flow solver cases are quantitative, variations of which have been published in previous well-cited JFM and JCP manuscripts. This paper accelerates a geometric multigrid method which can be applied to any structured-grid simulation. An extension to algebraic multigrid methods for simulations on unstructured-grids is an interesting concept for future work. I've added discussion to this effect to the conclusions.
+b. Most immersed boundary methods don't even adjust their pressure equations for the presence of the body, meaning they match the cases without immersed geometries in this manuscript. (My group has shown how inaccurate this makes their pressure projection, but at least the current solver would find those inaccurate solutions 2-3x faster!) I have added discussion on the immersed boundary method used in this work and a few references.
+c. I've better motivated the synthetic cases "A set of six synthetic cases were developed to establish the ability of the data-driven approach to project out residuals located at domain boundaries, body boundaries, or within the fluid." and added their details in a new Appendix A. From the expanded discussion in the text, it is hopefully clear that the synthetic case body being "streamlined" or not is immaterial. There is a streamlined body case in section 5 which, of course, features all the residual elements of the synthetic cases. Thank you for pointing out the plotting error in that figure, which has been corrected.
+
+3.      The high-level, almost cursory, review of the literature in the introduction does not clearly delineate any distinct shortcomings of existing methods that the presented method addresses. As such, it is not clear what the point-by-point contributions of the manuscript are or what the advantages of the method presented are compared to other methods.
+
+3. I have added more discussion to the lit review to clarify the current contribution. In short, the existing CNN methods have not been developed to the point of solving any linear system with quantitative accuracy. The previous data-driven methods applied to improve the restriction and expansion operators have not achieved any acceleration. And the results of non-data-driven methods vary wildly depending on the application. As such, this paper's demonstration of 2-3x speed up using data-driven methods to accurately project out the velocity-divergence across a wide range of flow problems is the first of its kind. 
+
+4.      The metric of "relative time" is not clearly defined and is being compared to a V-cycle Jacobi smoother, which is considered an unviable option. The author then spends time on the top of page 9 discussing the number of cycles to convergence and comparison to serial smoothers. The basis of what defines a successful reduction in time is unclear to the reader.  How does it compare to viable options or traditional Multi-grid solvers?
+
+4. Apologies for the confusion. In all of these cases, I'm comparing GMG V-cycle performance. Both the GS-GMG and SOR-GMG are viable and "traditional Multi-grid" solvers and are extremely difficult to outperform. I'm comparing the traditional solvers and the new method to a single Jacobi-smoothed V-cycle to for two reasons. 1) It is the smallest number of operations required for the V-cycle and therefore gives us a theoretical minimum time for solving a given linear system. Using this as our unit of time therefore normalizes the results across different grids. 2) The Jacobi smoother is the initial-condition for the data-driven method. Therefore, comparing the new method's residual results against a Jacobi V-cycle is a direct way to measure the improvement due to data-driven learning. I've added this discussion to section 4.
+
+Minor concerns and suggestions
+1.      The break between section 2 and the first four paragraphs of section 3 is weird.
+
+1. Thank you. I have completely removed all weirdness. 
+
+2.      Beginning with the abstract, the work hedges and says that the manuscript discusses the potential of data-driven methods to accelerate the pressure projection problem. It reads weak.
+
+2. I agree. The abstract now reads "This work demonstrates the ability of data-driven methods to accelerate the approximate solution of the Poisson equation at the heart of pressure projection."
+
+3.      The results in figure 4 are small and hard to see the residual at the areas of interest around the bodies and in the wakes.
+
+3. I've increased the size by reformatting the figure.
+
+4.      The legends on all of the bar plots interfere with reading the data.
+
+4. I've moved the legends to the side.

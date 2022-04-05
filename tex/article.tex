@@ -10,13 +10,14 @@
 \usepackage{caption}
 \usepackage{subcaption}
 \usepackage{amsmath}
+\usepackage{xcolor}
 %%%%%%%%%%%%%%%%%%%%%%%
 
 \begin{document}
 
 \begin{frontmatter}
 
-\title{Data-Driven Multi-grid Solver for Accelerated \\ Pressure Projection}
+\title{Data-Driven Multi-Grid Solver for Accelerated \\ Pressure Projection}
 
 %% Group authors per affiliation:
 \author{Gabriel D Weymouth}
@@ -25,7 +26,7 @@
 \ead[url]{https://weymouth.github.io/}
 
 \begin{abstract}
-Pressure projection is the single most computationally expensive step in an unsteady incompressible fluid simulation. This work discusses the potential of data-driven methods to accelerate the approximate solution of the Poisson equation at the heart of pressure projection, linking Multi-grid methods to linear convolutional encoder-decoder networks. A high-speed Jacobi-like parameterized smoother is developed and optimized using automatic differentiation on the recursive log-residual loss function. The new method is found to accelerate classic Multi-grid methods by a factor of 2-3 with no loss of accuracy on eleven 2D and 3D flow cases including cases with dynamic immersed solid boundaries. The optimal parameters are found to transfer nearly 100\% effectiveness as the resolution is increased, providing a robust approach for accelerated pressure projection of general flows.
+Pressure projection is the single most computationally expensive step in an unsteady incompressible fluid simulation. \textcolor{blue}{This work demonstrates the ability of data-driven methods to accelerate the approximate solution of the Poisson equation at the heart of pressure projection.} Geometric Multi-Grid methods are identified as linear convolutional encoder-decoder networks and a data-driven smoother is developed using automatic differentiation to optimize the velocity-divergence projection. The new method is found to accelerate classic Multi-Grid methods by a factor of two to three with no loss of accuracy on eleven 2D and 3D flow cases including cases with dynamic immersed solid boundaries. The optimal parameters are found to transfer nearly 100\% effectiveness as the resolution is increased, providing a robust approach for accelerated pressure projection of unsteady flows.
 \end{abstract}
 
 \begin{keyword}
@@ -36,7 +37,7 @@ pressure projection, linear algebra, data-driven
 
 \section{Introduction}
 
-Pressure projection is a bottleneck in high-speed unsteady incompressible flow solvers. Constructing approximate solutions the discrete pressure Poisson system is the most expensive part of each time-step as the elliptic equation requires communication throughout the computational domain instead of being confined to a local characteristic. As such, the proportional cost only grows in massively parallel simulations due to the required communication across processes. Methods such as artificial-compressibility \cite{he2002comparison}, smooth-particle-hydrodynamics \cite{kiara2013sph}, and particle-in-cell \cite{jiang2017angular} attempt to side-step this computational cost by modelling or otherwise under-resolving the pressure evolution compared to the fluid's momentum. However, these approaches lead to significant errors in pressure forces, thereby making them unsuitable for many applications or requiring explicit pressure corrections, \cite{kiara2013sph}.
+Pressure projection is a bottleneck in high-speed unsteady incompressible flow solvers. Constructing approximate solutions for the discrete pressure Poisson system is the most expensive part of each time-step as the elliptic equation requires communication throughout the computational domain instead of being confined to a local characteristic. As such, the proportional cost only grows in massively parallel simulations due to the required communication across processes. Methods such as artificial-compressibility \cite{he2002comparison}, smooth-particle-hydrodynamics \cite{kiara2013sph}, and particle-in-cell \cite{jiang2017angular} attempt to side-step this computational cost by modelling or otherwise under-resolving the pressure evolution compared to the fluid's momentum. However, these approaches lead to significant errors in pressure forces, thereby making them unsuitable for many applications or requiring explicit pressure corrections, \cite{kiara2013sph}.
 
 \begin{figure}
     \centering
@@ -45,13 +46,15 @@ Pressure projection is a bottleneck in high-speed unsteady incompressible flow s
     \label{fig:multigrid}
 \end{figure}
 
-Advances in data-driven acceleration of flow solvers have mainly focused on reducing simulation resolution using data-assimilation and data-driven turbulence closures \cite{asch2016data,BECK2019108910,maulik_san_rasheed_vedula_2019,ling_kurzawski_templeton_2016,font2021deep} without focusing on projection explicitly. Many of these approaches utilize Convolutional Neural Networks (CNN), Figure \ref{fig:multigrid}, which have been successfully applied in other fluids applications such as super-resolution \cite{liu2020deep} and full field regression models \cite{bhatnagar2019prediction}. CNNs have inherent translational symmetry and encoder-decoder architectures reduce the number of variables before expanding again, both of which help constrain learning capacity and generalize the trained networks to unseen prediction cases. 
+Advances in data-driven acceleration of flow solvers have mainly focused on reducing simulation resolution using data-assimilation and data-driven turbulence closures \cite{asch2016data,BECK2019108910,maulik_san_rasheed_vedula_2019,ling_kurzawski_templeton_2016,font2021deep} without focusing on projection explicitly. Many of these approaches utilize Convolutional Neural Networks (CNN), Figure \ref{fig:multigrid}, which have been successfully applied in other fluids applications such as super-resolution \cite{liu2020deep} and full field regression models \cite{bhatnagar2019prediction}. The CNN's inherent translation symmetry and the encoder-decoder architecture's reduction and expansion of the array size both help constrain model learning capacity and generalize the trained networks to unseen prediction cases. 
 
-A few recent studies have applied machine-learning to accelerate the critical projection step itself \cite{ozbay2021poisson,Xiao2020,ajuria2020} using CNNs to predict the pressure field given the projection source term. All of these method assume a uniform grid without internal solid geometries, although \cite{ozbay2021poisson} uses a decomposition to handle different \textit{domain} boundary conditions and grid aspect ratios in 2D. Unfortunately, the methods can't be applied to most simulation problems and the results are still somewhat qualitative, with pressure errors greater than 10\% throughout much of the domain \cite{ozbay2021poisson}. 
+A few recent studies have applied machine-learning to accelerate the critical projection step itself \cite{ozbay2021poisson,Xiao2020,ajuria2020} using CNNs to predict the pressure field given the projection source term. All of these method assume a uniform grid without internal solid geometries, although \cite{ozbay2021poisson} uses a decomposition to handle different \textit{domain} boundary conditions and grid aspect ratios in 2D. Unfortunately, the methods can't be applied to most simulation problems and even state-of-the-art results are still qualitative, with errors greater than 10\% throughout much of the domain \cite{ozbay2021poisson}. 
 
-A key insight is that classic Geometric Multi-Grid (GMG) methods \cite{briggs2000multigrid} are simply \textit{linear} convolutional encoder-decoder networks, Figure \ref{fig:multigrid}, prime for data-driven acceleration without any loss of accuracy in the resulting pressure field. While there is a long history of optimizing multi-grid methods (both geometric \cite{oosterlee2003genetic} and algebraic \cite{brezina2006adaptive}), few of these have taken a direct data-driven approach. Recent work \cite{KATRUTSA2020112524,greenfeld2019learning} has shown promising initial results in constructing data-driven restriction and prolongation operators, but both use idealized systems and do not show overall speed-up compared to classic methods, so their utility in accelerating real pressure projection problems is untested.
+A key insight to accelerating pressure projection is that classic Geometric Multi-Grid (GMG) methods \cite{briggs2000multigrid} are simply \textit{linear} convolutional encoder-decoder networks, Figure \ref{fig:multigrid}. While there is a long history of optimizing multi-grid methods (both geometric \cite{tang2000sparse} and algebraic \cite{brezina2006adaptive}), few of these have taken a direct data-driven approach. \textcolor{blue}{\cite{tang2000sparse} construct a sparse approximate smoother by solving a series of least-square matrix equations instead of a data-driven approach. This improved the convergence properties on extremely skewed grids compared to Gauss-Sidel smoothers, but not on more regular grids or when using a very sparse (and therefore fast) approximate inverse.} 
 
-Building on this foundation, this work develops a simple and accurate data-driven projection method which outperforms classic geometric multi-grid on eleven 2D and 3D benchmarks including those with immersed solid boundaries. Moreover, since the new approach is linear in the pressure and the nonlinear dependence on the matrix coefficients are scale-invariant, the data-optimized parameters generalize extremely well to new flows and simulation resolutions.
+Employing modern data-driven techniques could  further accelerate GMG without the loss of accuracy currently limiting CNN methods.  Recent work has shown promising initial results in constructing data-driven restriction and prolongation operators \cite{KATRUTSA2020112524,greenfeld2019learning}. \textcolor{blue}{However, improving the architecture of these operators is a very challenging discrete optimization problem, limiting the results achieved thus far. Both \cite{KATRUTSA2020112524,greenfeld2019learning} show improved convergence spectra compared to classic GMG methods, but no overall speed-up. }
+
+\textcolor{blue}{Building on this foundation, this manuscript develops a novel data-driven smoother which is optimize using automatic differentiation to minimize the velocity-divergence over the full recursive GMG V-cycle. This new framework achieves 2 to 3-fold acceleration compared to standard GMG on eleven 2D and 3D benchmark projection problems including those derived from unsteady Navier-Stokes simulations with dynamic immersed boundaries.} Moreover, since the new approach maintains linearity in the pressure and the nonlinear dependence on the matrix coefficients are scale-invariant, the data-optimized parameters generalize extremely well to new flows and simulation resolutions.
 
 \section{Linear System Description}
 
@@ -59,53 +62,55 @@ The discrete Poisson equation in the projection step is defined as
 \begin{equation}\label{eq:axb}
     A x = b
 \end{equation}
-where $x$ is the desired pressure field vector, $b$ is the source term (proportional to the divergence of the velocity field to be projected), and $A$ is the Poisson matrix. For conservative Poisson equations, $A$ is symmetric, has zero-sum rows and columns, is negative semi-definite, and has a single zero eigenvalue. The matrix is also extremely sparse. While the solution vector size $N$ may easily be $10^6-10^8$, a second-order scheme on structured grids in $M$ dimensions result in only $M$ non-zero sub-diagonals.
+where $x$ is the unknown pressure field vector, $b$ is the source term proportional to the divergence of the velocity field to be projected, and $A$ is the discrete matrix for the Poisson operator. For a conservative Poisson operator, $A$ is symmetric, has zero-sum rows and columns, is negative semi-definite, and has a single zero eigenvalue. The matrix is also extremely sparse. While the solution vector size $N$ may easily be $10^6-10^8$, a second-order scheme on structured grids in $M$ dimensions result in only $M$ non-zero sub-diagonals.
 
 Iterative methods solve equation \ref{eq:axb} by updating an approximate solution $x^k$ to a new solution $x^{k+1}$ with reduced error. As the problem is linear, the equation for the update $\epsilon$ is simply
 \begin{equation}\label{eq:aer} 
     A \epsilon^k = r^k \equiv b - Ax^k
 \end{equation}
-where $r$ is the residual. In practise, only an approximate solution for $\epsilon$ is obtained, after which the solution and residual are incremented
+where $r$ is the residual. \textcolor{blue}{In the context of the pressure Poisson equation, the residual is the remaining divergence in the velocity field. Driving this residual to zero by updating the pressure is the goal of the projection step.} 
+
+In practise, only an approximate solution for $\epsilon$ is obtained, after which the solution and residual are incremented
 \begin{equation}\label{eq:increment}
     x^{k+1} = x^k+\epsilon^k, \quad r^{k+1} = r^k-A\epsilon^k.
 \end{equation}
-This process is iterated until the residual is reduced to a specified level.
+\textcolor{blue}{This process is iterated until the velocity-divergence residual is reduced to a specified tolerance, at which point the projection step is complete.}
 
-Geometric Multi-Grid (GMG) methods are among the fastest iterative solution approaches for variable coefficient discrete pressure Poisson equations. A single iteration of GMG is called a V-cycle and consists of (i) a solution precondition step, (ii) residual restriction down to the reduced-size problem, (iii) approximate solution of this problem, (iv) solution prolongation back up to correct the fine grid, and (v) solution smoothing. This process is recursive, being applied to the reduced-size problems until they are small enough to be solved directly, resulting in $O(N\log N)$ computational cost overall.
-% \begin{equation}
-%     r_c = R r \quad\rightarrow\quad A_c \epsilon_c = r_c \quad\rightarrow\quad \epsilon = P \epsilon_c
-% \end{equation}
-% where $R$ is the $N_c \times N$ restriction operator, $P$ is the $N \times N_c$ prolongation operator 
+Geometric Multi-Grid (GMG) methods are among the fastest iterative solution approaches for variable coefficient discrete pressure Poisson equations. A single iteration of GMG is called a V-cycle and consists of (i) a solution precondition step, (ii) residual restriction down to the reduced-size problem, (iii) approximate solution of this problem, (iv) solution prolongation back up to correct the fine grid, and (v) solution smoothing. This process is recursive, being applied to the reduced-size problems until they are small enough to be solved directly, resulting in $O(N)$ operations per V-cycle.
 The first four steps of the V-cycle distribute the residual throughout the domain, which enables simple and relatively fast stationary methods such as Gauss-Sidel or Successive Over Relation (SOR) to effectively smooth the local error in the projected solution. The V-cycle can be repeated until convergence or used as an efficient preconditioner for another iterative solver such as Conjugate Gradient. 
 
 \section{Data-driven Accelerated Projection Method}
 
-As \textit{any} element of the residual of the elliptic Poisson system potentially influences \textit{every} element of the update, $O(N\log N)$ is the best possible solution time scaling. However, data-driven methods can still be used to accelerate pressure projection by speeding-up and increasing the residual reduction of each V-cycle iteration.
+As the Poisson equation is elliptic, \textit{any} element of the velocity-divergence residual $r$ potentially influences \textit{every} element of the update $\epsilon$. Therefore the linear $O(N)$ scaling achieved by GMG is already optimal. However, data-driven methods can still be used to accelerate GMG projection by speeding-up and increasing the residual reduction of each V-cycle iteration.
 
-The linearity of equation \ref{eq:aer} is a critical property which the data-driven method must maintain. Consider that the modes of the residual will change as the solver converges, meaning that a nonlinear method could not be applied iteratively. However, this linearity is only with respect to the update and residual fields. The operators of the MG method can all potentially be (implicit or explicit) nonlinear functions of $A$, embedding information about the discrete problem and boundary conditions. 
+The linearity of equation \ref{eq:aer} is a critical property which the data-driven projection method must maintain. Without it, the projection method can not be applied iteratively to drive the velocity-divergence to the required tolerance of the flow solver. However, this linearity is only with respect to the update and residual fields. The GMG operators can potentially be explicit nonlinear functions of $A$, embedding information about the discrete problem and boundary conditions. 
 
-Which MG operation is the best candidate for such an approach? As discussed in the introduction, significant effort has focused on optimization of the prolongation operator and its transpose restriction operator. The prolongation operator is an \textit{implicit} function of $A$, making their construction difficult in algebraic settings and their optimization mathematically and numerically complex even in geometric settings \cite{KATRUTSA2020112524,greenfeld2019learning}. Note that super-resolution operators are related to prolongation, but would violate the linearity constraint. 
+Which GMG operation is the best candidate for such an approach? Significant effort has focused on the optimization of the prolongation operator and its transpose restriction operator. However, prolongation/restriction operators are not explicit functions of $A$, making their optimization mathematically and numerically complex \cite{KATRUTSA2020112524,greenfeld2019learning}. And while CNN encoding/decoding are simple to optimize with back-propagation, their nonlinear activation functions make them invalid in this application. 
 
 Another option is the precondition operator, but a simple Jacobi preconditioner
 \begin{equation}
     \epsilon = D^{-1}r
 \end{equation}
-where $D$ is the diagonal of $A$, is sufficient for the V-cycle to distribute the residual throughout the domain and is as fast as possible; being a single Schur (broadcasted) vector product. Therefore, for the remainder of the paper we will use a simple Jacobi preconditioner and uniform pooling/distribution for restriction/prolongation and focus on a parameterized smoothing operator.
+where $D$ is the diagonal of $A$, is sufficient for the V-cycle to distribute the residual throughout the domain and is as fast as possible; being a single Schur (broadcasted) vector product. Therefore, for the remainder of the paper we will use a simple Jacobi preconditioner and uniform pooling/distribution for restriction/prolongation and focus on a data-driven smoothing operator.
 
-While more complex options are certainly possible, this work uses a simple parameterized Jacobi-like smoother
+While more complex options are certainly possible, this work considers a sparse approximate inverse as a smoother
 \begin{equation}\label{eq:smooth}
     \epsilon = \tilde A^{-1}r
 \end{equation}
-where $\tilde A^{-1}=f(A\,|\theta)$ is an approximate matrix-inverse with the same sparsity as $A$ and parameter vector $\theta$. The matrix $A$ is constant during the projection step (and often for an entire simulation), meaning $\tilde A^{-1}$ can be computed and stored ahead of time. And unlike Gauss-Sidel or SOR smoothers, the matrix-vector multiplication of equation \ref{eq:smooth} requires no back-propagation and so can be vectorized in serial or parallel implementations, offering a significant potential speed-up. 
+where $\tilde A^{-1}=f(A\,|\theta)$ is a parameterized pseudo-inverse with the same sparsity as $A$ and $\theta$ is the parameter vector. The advantage of this pseudo-inverse smoother is speed. Unlike Gauss-Sidel or SOR smoothers, the sparse matrix-vector multiplication of equation \ref{eq:smooth} requires no back-propagation and so can be vectorized in serial or parallel implementations, offering a significant potential speed-up. Additionally, the matrix $A$ is constant during the projection step (and often for an entire simulation), meaning $\tilde A^{-1}$ can be stored ahead of time, avoiding on the fly function evaluations.
 
-There are few constraints on $\tilde A^{-1}$: it must have units of $A^{-1}$, and symmetry of $A$ implies the approximate inverse should also be symmetric. For simplicity, the diagonal and off-diagonal coefficients of $\tilde A^{-1}$ are constructed independently 
+There are few constraints on $\tilde A^{-1}$: it must scale with $A^{-1}$, and symmetry of $A$ implies the pseudo-inverse should also be symmetric. For simplicity, the diagonal and off-diagonal coefficients of $\tilde A^{-1}$ are constructed independently 
 \begin{equation}\label{eq:approxinv}
     \tilde a^{-1}_{ii} = \frac{f_d(a_{ii}/s\,|\theta_d)}{a_{ii}} , \quad
     \tilde a^{-1}_{ij} = \frac{f_o(a_{ij}/s\,|\theta_o)}{a_{ii}+a_{jj}}
 \end{equation}
 where function inputs are scaled by the maximum off-diagonal $s=\max(A-D)$ and the outputs are scaled by the diagonal elements. Note that $f_o(0)=0$ is required to maintain the sparsity of $\tilde A^{-1}$ and that a Jacobi smoother would use a diagonal function $f_d=1$ and off-diagonal function $f_o=0$. With the optimization problem now reduced to two normalized single-variable functions, the specific choice of parameterization is not critical and a simple quadratic is chosen for $f_d$ and $f_o$. Using higher-order polynomials, splines, and interpolating kernels did not significantly change the results.
 
-The parameterized smoother is optimized for a set of training data $X=\{A,x^k,b\}$. The loss function is simply the reduction in the norm of the residual after a V-cycle iteration $L = \log_{10}(|r^{k+1}| / |r^{k}|)$, which means that example pressure \textit{solutions} are not required. This loss is averaged over each iteration and each example in the data-set. The optimal parameters are defined as
+The parameterized smoother is optimized for a set of training data $X=\{A,r^0\}$. The loss is defined as the reduction in the log-$L_2$-norm of the residual after each V-cycle iteration 
+$$L = \log_{10}(|r^{k+1}|_2 / |r^{k}|_2)$$
+This loss is averaged over each iteration and each example in the data-set. \textcolor{blue}{Working directly with a residual loss has a number of advantages. First and foremost, the purpose of the pressure projection step is to drive the velocity-divergence residual to zero, making this the ultimate judge of any projection method. Second, this incorporates problem-specific residual data which would be missing from a metric based only on the V-cycle operator. Finally, the residual is always available, unlike the error with respect to the unknown exact pressure solution.}
+
+The optimal parameters of the accelerated GMG projection method are then given by the minimization
 \begin{equation}
     \hat\theta = \min_\theta L(\theta\, |X)
 \end{equation}
@@ -133,9 +138,17 @@ The data-driven solver and all test cases presented in the following sections ar
         \caption{2D-sphere}
         \label{fig:2D-sphere}
     \end{subfigure}
-    \caption{Sample solutions from the data-sets of three of the six synthetic cases.}
+    \caption{Sample solutions (left) from the data-sets of three of the six synthetic cases. \textcolor{blue}{Also shown are the solution errors (middle) and residuals (right) using the data-driven solvers using after reducing the residual norm by $10^{-3}$.}}
     \label{fig:synthetic cases}
 \end{figure}
+
+\section{Synthetic Discrete Poisson System Results}
+
+\textcolor{blue}{A set of six synthetic cases were developed to establish the ability of the data-driven approach to project out residuals located at domain boundaries, body boundaries, or within the fluid. The three 2D cases are shown in Figure~\ref{fig:synthetic cases}, and each has a matching 3D case. The `static' cases feature a randomized pressure gradient throughout the domain produced by residuals on the domain boundaries. The `dipole' and `sphere' cases feature residuals on a random dipole or on the boundary of a random immersed sphere within an otherwise quiescent flow. Neumann conditions are applied on the domain and sphere boundaries using the Boundary Data Immersion Method (BDIM) to adjust the $A$ matrix coefficients, as described and validated in \cite{maertens2015accurate,Lauber2022}. The  generative equations for each synthetic case are given in \ref{app synth}.}
+
+%All cases are initialized with $x^0=0$ and all cases feature initially localized residuals; i.e. $r^0\ne0$ only in a fraction of the cells, but $x$ must be updated throughout the domain, starkly illustrating the elliptic nature of the projection step.
+A data-driven GMG solver is optimized for each synthetic case using 100 randomized training examples. \textcolor{blue}{Figure~\ref{fig:synthetic cases} shows the velocity residual distribution produced by the trained solvers using a tolerance of $|r^k|_2/|r^0|_2<10^{-3}$, as well as the error in the pressure compared to a result obtained using a classic GMG method converged to machine precision. The results show that the initially highly-localized residual is project and distributed throughout the domain, without build-up on the domain or immersed boundaries.} 
+
 \begin{figure}
     \centering
     \begin{subfigure}[b]{0.47\textwidth}
@@ -151,21 +164,15 @@ The data-driven solver and all test cases presented in the following sections ar
         \caption{solver time}
         \label{fig:synthetic time}
     \end{subfigure}
-    \caption{a) Residual reduction factor $|r_{k+1}|/|r_k|$ over a single Multi-grid V-cycle on the `test' case after tuning using the `train' case. `Jacobi` is the V-cycle performance using a classic Jacobi smoother, and `union' refers to the solver trained on all of the synthetic cases. (b) Time to reduce pressure residual by $10^{-3}$ for classical and parameterized smoothers on each synthetic case. Time is relative to the time of a single V-cycle using the Jacobi smoother.}
+    \caption{a) Residual reduction factor $|r_{k+1}|/|r_k|$ over a single Multi-grid V-cycle on the `test' case after tuning using the `train' case. `Jacobi` is the V-cycle performance using a classic Jacobi smoother, and `union' refers to the solver trained on all of the synthetic cases. (b) Time to reduce pressure residual by $10^{-3}$ for classical and parameterized smoothers on each synthetic case. Time is relative to a single Jacobi-smoothed V-cycle on each grid.}
     \label{fig:synthetic results}
 \end{figure}
 
-\section{Synthetic Discrete Poisson System Results}
+Figure~\ref{fig:cross plot} quantifies the generalization performance of each trained projection method on 100 unseen test examples for each case. \textcolor{blue}{The results for a Jacobi-smoothed GMG V-cycle are shown for comparison as this is the initial condition for the \textit{untrained} data-driven method.} After training, the data-driven method vastly outperform the Jacobi V-cycle, doubling the residual loss on the 3D-dipole case and providing nearly 30-fold improvement on the 3D-static case. While the performance of the data-driven projection method is best when testing and training on the same case, most of the solvers still improve on the Jacobi-smoothed GMG performance for cases outside of their training set. Indeed, the solver trained on the 2D-sphere generalizes essentially as well as a solver trained on the `union' of the all training case data. The exceptions are the static cases, with the solver trained on the 2D-static case failing to converge on three of the other test cases. Note that despite identical $A$ matrices in the static and dipole cases, the performance of the those solvers are completely different. This indicates that the data-driven methods are specializing based on the residual data as well as the matrix structure, a feature unique to this approach.
 
-A set of six synthetic projection cases were constructed to establish the characteristics of the data-driven approach. The three 2D cases are shown in Figure~\ref{fig:synthetic cases}, and each has a matching 3D case. The `static' cases have a hydrostatic gradient throughout the domain, with the direction and magnitude randomized. The `dipole' and `sphere' cases have a randomized dipole/sphere within a quiescent flow. All cases are initialized with $x^0=0$.
-%, and all cases feature initially localized residuals; i.e. $r^0\ne0$ only in a fraction of the cells, but $x$ must be updated throughout the domain, starkly illustrating the elliptic nature of the projection step.
-Neumann boundary conditions are applied on all boundaries, including the boundary of the immersed sphere, through adjustment of the $A$ matrix coefficients which are otherwise uniform. 
+\textcolor{blue}{Next, the acceleration of the data-driven projection method is evaluated against high-performance GMG solvers using classic stationary smoothers; Gauss-Sidel and SOR.} The `union'-trained data-driven solver is chosen and 100 tests are generated for each case on different grids to test the ability of the data-driven method to generalize to new grid sizes.
 
-Figure~\ref{fig:cross plot} characterizes the generalization of the parameterized smoother's residual reduction over a single V-cycle on 100 randomized `test' case examples after optimization using 100 examples of the `train' case. Each example uses a grid size of $N=32^M$ points, ie $N=32^2$ in 2D and $N=32^3$ in 3D. The V-cycle residual reduction using a Jacobi-smoother is shown for comparison, as this is the fastest option and the initial condition for the data-driven method. The data driven-method vastly outperforms the Jacobi-smoothed V-cycle, improving the residual loss from 105\% on the 3D-dipole case to 2880\% on the 3D-static case.
-
-As expected, the performance of the data-driven projection method is best when testing and training on the same case, with a single V-cycle reducing the residual by $|r_{k+1}|/|r_k|=10^{-1.19}$ on the 2D-sphere case down to $10^{-1.68}$ on the 2D-dipole case. Note that despite identical $A$ matrices in the static and dipole cases, the data-driven method finds completely different optimal $\tilde A^{-1}$ matrices, as shown by their different generalization performance. While the performance of the solver trained on the simple static cases generalizes poorly, the others cases generalize well and the solver trained on the 2D-sphere performs nearly as well as the solver trained on the `union' of the all data. 
-
-The acceleration of the `union'-trained data-driven projection method is evaluated on new example data of a different size, $n=64^M$ points. Figure~\ref{fig:synthetic time} shows the time required to reduce the residual by $10^{-3}$. The time is scaled by the time required to run a single V-cycle using a Jacobi smoother but the Jacobi smoother isn't a viable option since it can require hundreds of V-cycles to solve even these simple projection problems. While the Jacobi-like parameterized smoother is only around 30-50\% slower per V-cycle, it converges in only 1-3 V-cycles in all cases. This results in a 80-210\% speed-up (mean: 133\%) relative to optimized serial Gauss-Sidel and SOR smoothers. This speed-up will be even more favorable in parallel computation as the new smoother operates directly on the local residual without back-propagation, eliminating any additional communication.
+The results in Figure~\ref{fig:synthetic time} show that the data-driven method has no issue projecting the velocity divergence on unseen grid sizes, reducing the residual by $10^{-3}$ in only 2-5x the time of a single Jacobi-smoothed V-cycle. \textcolor{blue}{This is chosen as our unit of time since Jacobi-smoothing requires the smallest possible number of operations per V-cycle on a given grid.} As the pseudo-inverse smoother is many times faster than the Gauss-Sidel and SOR smoothers, this results in an overall 80-210\% speed-up (mean: 133\%) relative to classic GMG solvers. Note that this speed-up will be even more favorable in parallel computation as the new smoother operates directly on the local residual without back-propagation, eliminating any additional communication.
 
 \begin{figure}
     \centering
@@ -199,9 +206,29 @@ The acceleration of the `union'-trained data-driven projection method is evaluat
     \label{fig:simulation cases}
 \end{figure}
 
-\section{Unsteady Incompressible Simulation Results}
+\section{Unsteady Incompressible Simulation Projection Results}
 
-Five unsteady incompressible simulation cases were used to further characterize the accelerated projection method, Figure \ref{fig:simulation cases}. All simulations use the same validated Cartesian-grid method \cite{maertens2015accurate} but feature significantly different physics, i.e. 2D and 3D simulations with and without background flows, immersed geometries, body motion, and body deformation. The computational grids are of different sizes and aspect ratios, and the V-cycle is extended recursively down to the smallest possible grid in all cases. 
+Five unsteady incompressible simulation cases were used to further characterize the accelerated projection method, Figure \ref{fig:simulation cases}. \textcolor{blue}{The first three cases are variations on standard unsteady flow benchmarks, while the second two are variations of recent validated biologically-inspired flows \cite{Lauber2022}.} The simulations feature significantly different physics to test the accelerated projection performance from flows with and without background velocities, immersed geometries, body motion, and body deformation, as well as using computational grids of different sizes and aspect ratios. \textcolor{blue}{All simulations use the same extensively validated unsteady incompressible Navier-Stokes BDIM solver \cite{maertens2015accurate,Lauber2022} and 100 Poisson matrices $A$ and initial residuals $r^0$ are copied from each unsteady simulation to form the training and testing data. The details of each case are found in \ref{app flow}.}
+
+Figure \ref{fig:simulation cases} shows the pressure solutions, initial residual field, and the residual after a single V-cycle of the data-driven GMG method trained on each case. The results show that the residual decreases throughout the domain, including at the domain and immersed boundaries. \textcolor{blue}{This is further verified by Fig~\ref{fig:simulation forces}, which compares the unsteady pressure force on the circle flow (case a) and the swimming shark (case b) using both the data-driven and Gauss-Sidel smoothed GMG solvers. In both cases, the data-driven method matches the Gauss-Sidel forces for the same residual tolerance.} As such, the new data-driven method is shown to produce uniformly valid solutions despite only being trained to optimize the global residual loss.
+
+\begin{figure}
+    \centering
+    \begin{subfigure}[b]{0.47\textwidth}
+        \centering
+        \caption{Cylinder pressure}
+    \end{subfigure}
+    \hfill
+    \begin{subfigure}[b]{0.47\textwidth}
+        \centering
+        \caption{Swimming shark}
+    \end{subfigure}
+    \caption{Integrated pressure forces on the (a) cylinder and (b) swimming shark test cases using the data-driven and Gauss-Sidel GMG solvers for different residual tolerance levels. The $|r^k/r^0|<10^{-3}$ level is indistinguishable from that obtained driving the residuals to machine zero.}
+    \label{fig:simulation forces}
+\end{figure}
+
+Figure \ref{fig:scaled loss} shows that when the data-driven method trained on the synthetic cases of the previous section is transferred to these unseen simulation cases, it reduces the residual 2.5 to 3.9 times more effectively than an untrained Jacobi-smoothed V-cycle. Indeed, without any further training this transfer solver achieves 85-95\% of the residual reduction of a smoother optimized for each new case. Even more promising is that training on reduced-size simulations closes that small gap almost completely. Training on a $1/4^\text{th}$-scale simulation is fast, requiring only $N/4^M$ points (N/16 in 2D and N/64 in 3D) and $\approx 1/4$ the number of time steps, while achieving 99-100\% of the residual reduction of training with full-scale data. Such an \textit{auto-tuning} approach enables a highly effective data-driven projection method to be developed for any flow simulation case with very little overhead. Figure \ref{fig:simulation time} shows that this data-driven method greatly accelerates the projection step relative to the classic MG methods on these real flow cases. The solver tuned on the reduced resolution cases provides 112 - 230\% acceleration, and even the transferred solver provides a mean acceleration of 120\%. 
+
 
 \begin{figure}
     \centering
@@ -221,11 +248,6 @@ Five unsteady incompressible simulation cases were used to further characterize 
         \caption{(a) Residual reduction over a single Multi-grid V-cycle on the full-resolution case. The `transfer' smoother has been trained on the union of the synthetic data sets from Figure~\ref{fig:synthetic cases}. The $\frac 18, \frac 14, \frac 12$ smoothers have been trained on simulations with the indicated reduced resolution \textit{in each spacial and temporal dimension}. (b) Time to reduce pressure residual by $10^{-3}$ for classical and parameterized smoothers on each simulation case. Time is relative to the time of a single V-cycle using the Jacobi smoother.}
         \label{fig:tuned simulation}
 \end{figure}
-
-Figure \ref{fig:scaled loss} shows that when the data-driven method trained on the synthetic cases of the previous section is transferred to these unseen simulation cases, it reduces the residual 2.5 to 3.9 times more effectively than a V-cycle using Jacobi smoothing. Indeed, without any further training this transfer solver achieves 85-95\% of the residual reduction of a smoother optimized for each new case. Even more promising is that training on reduced-size simulations closes that small gap almost completely. Training on a $1/4^\text{th}$-scale simulation is fast, requiring only $N/4^M$ points (N/16 in 2D and N/64 in 3D) and $\approx 1/4$ the number of time steps, while achieving 99-100\% of the residual reduction of training with full-scale data. Such an \textit{auto-tuning} approach enables a highly effective data-driven projection method to be developed for any flow simulation case with very little overhead.
-
-Figure \ref{fig:simulation time} shows that this data-driven method greatly accelerates the projection step relative to the classic MG methods on these real flow cases. The solver tuned on the reduced resolution cases provides 112 - 230\% acceleration, and even the transferred solver provides a mean acceleration of 120\%. The pressure solutions, initial residual field, and the residual after a single data-driven V-cycle are shown in \ref{fig:simulation cases}. The residual decreases throughout the domain, including at the external and internal boundaries. As such, the new data-driven method is shown to produce uniformly valid solutions despite only being trained to optimize the global residual loss.
-
 \begin{figure}
     \centering
     \begin{subfigure}[b]{0.47\textwidth}
@@ -247,11 +269,46 @@ Finally, the parameterized $f_d,\,f_o$ functions used in the approximate inverse
 
 \section{Conclusions}
 
-This manuscript develops a successful data-driven method to accelerate the solution of discrete pressure Poisson systems found in incompressible flow simulations. Multi-grid methods are identified as linear convolutional encoder-decoder networks with optimal ($N\log N$) scaling, and the matrix coefficients are identified as the critical nonlinear input, not the projection source-term, embedding information such as boundary conditions. Mathematical constraints are used to further focus the learning capacity to a parameterized Jacobi-like Multi-grid smoother. The resulting data-driven solver is within 33\% of the minimum computational cost per V-cycle, and shown to accelerate classic Gauss-Sidel and SOR smoothers by 80-233\% on eleven simulation cases. Because of the focused learning capacity, the generalization is excellent, enabling 90\% effective transfer learning from a synthetic data-set and nearly 100\% transfer from reduced resolution simulations. 
+This manuscript develops a successful data-driven method to accelerate the solution of discrete pressure Poisson systems found in incompressible flow simulations. Geometric Multi-Grid (GMG) methods are identified as linear convolutional encoder-decoder networks with optimal $O(N)$ scaling, and the matrix coefficients are identified as a critical nonlinear input, not only the projection source-term, as they embed information such as boundary conditions. Mathematical constraints are used to further focus the learning capacity to a parameterized Jacobi-like Multi-grid smoother. The resulting data-driven solver is within 33\% of the minimum computational cost per V-cycle, and shown to accelerate classic Gauss-Sidel and SOR smoothed GMG solvers by 80-233\% on eleven simulation cases. Because of the focused learning capacity, the generalization is excellent, enabling 90\% effective transfer learning from a synthetic data-set and nearly 100\% transfer from reduced resolution simulations.
 
-The potential of machine learning advances to improve fluid dynamics is vast, but well-applied classical methods and constraints are needed to focus this potential. Wherever possible, this work has made the simplest choice in parameterization, leaving significant opportunities for future improvements. Many other flow solvers and linear systems are yet to be explored, and extensions to this basic data-driven approach could accelerate solutions for a wide array of discrete partial differential equations. 
-
+The potential of machine learning advances to improve fluid dynamics is vast, but well-applied classical methods and constraints are needed to focus this potential. Wherever possible, this work has made the simplest choice in parameterization, leaving significant opportunities for future improvements. \textcolor{blue}{The flow cases in this manuscript use Cartesian-grids, but this does not limit the generality of the projection problems as the resulting $A$ matrices are nonuniform due to the presence of the immersed geometries. The current data-driven GMG framework can therefore be readily extended to the nonuniform matrices induced by stretched structured grids. Extensions to unstructured grids would require the use of algebraic instead of geometric multi-grid, and a similar data-driven sparse smoother could accelerate such projection methods.}
 
 \bibliography{mybibfile}
+\color{blue}
+\appendix
+\section{Synthetic case details}\label{app synth}
+
+The synthetic cases are all generated with simple functions on uniform 2D or 3D grid using $n$ grid cells in each direction. $n=32$ cells were used for the training data and the testing data in Fig~\ref{fig:cross plot}. $n=64,96$ and $128$ were used for the testing data in Fig~\ref{fig:synthetic time}.
+
+The 2D and 3D static cases are generated from a constant gradient solution
+$$ x_i = \hat m \cdot \vec q_i$$
+where $\vec q_i$ is the vector to the center of grid-cell $i$ and $\hat m$ is a random unit vector. The matrix $A$ is defined by $a_{ij}=1$ on cell faces, $a_{ij}=0$ on domain faces, and $a_{ii}=-\sum_j a_{ij}$. The initial residual is then $r^0=A x$ which is nonzero only on the domain boundaries.
+
+The 2D and 3D dipole cases are generated using a localized residual function
+$$ r_i = \hat m \cdot \left(\vec q_i-\vec Q\right)\ e^{-\sigma^2 |\vec q_i-\vec Q|^2} $$
+where $\vec Q$ is a random location in the fluid domain and $\sigma$ is a random width. The same uniform $A$ matrix is used as in the static case.
+
+The 2D and 3D sphere cases are generated using the residual from an immersed sphere with random center $\vec Q$ and radius $s$, moving in a random direction $\hat m$ in an initially still fluid. Following the Boundary Data Immersion Method \cite{maertens2015accurate,Lauber2022} the conservative  pressure equation is then
+$$ \oint_{\partial\Omega_i} \frac{\partial \phi}{\partial n}\beta \,\text{d}s = \oint_{\partial\Omega_i} m_n \,(1-\beta)  \,\text{d}s $$
+where $\partial\Omega_i$ are the faces of grid cell $i$, $\hat n$ is the face normal, $\phi$ is the scaled pressure, and $\beta$ is a coefficient which smoothly transitions from 1 to 0 as a function of the signed distance $d$ from the grid cell face to the immersed boundary. For example, a sphere has signed distance $d=|\vec q-\vec Q|-s$, and we could use $\beta=\min(1,\max(0,d+\frac 1 2))$.
+
+This equation is applied on each unit cell using second order central-finite difference and cell-center quadrature. For example, in 1D this gives
+\begin{gather*}
+a_{i,i-1}=\beta^w_i,\ a_{i,i+1}=\beta^e_i ,\ a_{ii}=-(\beta^w_i+\beta^e_i),\ a_{ij}=0\ \text{else}\\
+r_i =  -m\left(\beta^e_i-\beta^w_i\right)
+\end{gather*}
+where $\beta^{w,e}_i$ are the values on the west and east faces of cell $i$. The residual is non-zero only in the immersed boundary transition region where $\beta^e\ne\beta^w$.
+
+\section{Unsteady simulation case details}\label{app flow}
+
+The details for the five unsteady flow cases shown in Figure~\ref{fig:simulation cases} are:
+\begin{enumerate}[(a)]
+    \item 2D flow past a static circular cylinder: Radius $r=32$ grid cells, domain size $16r$ by $8r$ cells, cylinder center $(4r,4r)$, and Reynolds number $\text{Re}=Ur/\nu=250$.
+    \item 3D flow past a static donut: Major radius $R=32$ cells, minor radius $r=R/4$, domain size $8R$ by $4R$ by $4R$, center $(2R,2R,2R)$, and $\text{Re} = RU/\nu=10^3$.
+    \item 3D Taylor-Green Vortex turbulent decay: initial velocity function $u=-\sin(kx)\cos(ky)\cos(kz)$, $v=\cos(kx)\cos(ky)\cos(kz)$, $w=0$ with $k=\pi/n$, domain size $n=128$ cubed, and $\text{Re}=10^5$.
+    \item 2D flow induced by a flapping plate wing: Length $L=64$ cells, initial position $(3L,4L)$, horizontal displacement $x=L\sin(\omega t)$, rotation angle $\alpha=\frac\pi 4\cos(\omega t)$, domain size $6L$ by $6L$ cells, and $\text{Re}=\omega L^2/\nu=250$.
+    \item 2D flow past the undulating cross-section of a swimming shark: Body length $L=128$ cells, domain size $4L$ by $2L$, undulation wavenumber $k=5.3/L$, tail peak-to-peak amplitude $A=0.2L$, Strouhal number $\text{St}=fA/U=0.3$, and $\text{Re}=UL/\nu=10^4$.
+\end{enumerate}
+Reduced resolution training data used for Figure~\ref{fig:tuned simulation} uses the same setup as above, except the resolution is decreased. For example, a $\frac 14$-resolution wing simulation uses $L=16$ cells which reduces the amplitude of motion and domain size proportionally.
 
 \end{document}
