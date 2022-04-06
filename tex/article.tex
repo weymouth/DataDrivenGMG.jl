@@ -107,7 +107,9 @@ There are few constraints on $\tilde A^{-1}$: it must scale with $A^{-1}$, and s
 where function inputs are scaled by the maximum off-diagonal $s=\max(A-D)$ and the outputs are scaled by the diagonal elements. Note that $f_o(0)=0$ is required to maintain the sparsity of $\tilde A^{-1}$ and that a Jacobi smoother would use a diagonal function $f_d=1$ and off-diagonal function $f_o=0$. With the optimization problem now reduced to two normalized single-variable functions, the specific choice of parameterization is not critical and a simple quadratic is chosen for $f_d$ and $f_o$. Using higher-order polynomials, splines, and interpolating kernels did not significantly change the results.
 
 The parameterized smoother is optimized for a set of training data $X=\{A,r^0\}$. The loss is defined as the reduction in the log-$L_2$-norm of the residual after each V-cycle iteration 
-$$L = \log_{10}(|r^{k+1}|_2 / |r^{k}|_2)$$
+\begin{equation}
+L = \log_{10}(|r^{k+1}|_2 / |r^{k}|_2)
+\end{equation}
 This loss is averaged over each iteration and each example in the data-set. \textcolor{blue}{Working directly with a residual loss has a number of advantages. First and foremost, the purpose of the pressure projection step is to drive the velocity-divergence residual to zero, making this the ultimate judge of any projection method. Second, this incorporates problem-specific residual data which would be missing from a metric based only on the V-cycle operator. Finally, the residual is always available, unlike the error with respect to the unknown exact pressure solution.}
 
 The optimal parameters of the accelerated GMG projection method are then given by the minimization
@@ -285,7 +287,7 @@ $$ x_i = \hat m \cdot \vec q_i$$
 where $\vec q_i$ is the vector to the center of grid-cell $i$ and $\hat m$ is a random unit vector. The matrix $A$ is defined by $a_{ij}=1$ on cell faces, $a_{ij}=0$ on domain faces, and $a_{ii}=-\sum_j a_{ij}$. The initial residual is then $r^0=A x$ which is nonzero only on the domain boundaries.
 
 The 2D and 3D dipole cases are generated using a localized residual function
-$$ r_i = \hat m \cdot \left(\vec q_i-\vec Q\right)\ e^{-\sigma^2 |\vec q_i-\vec Q|^2} $$
+$$ r_i = \hat m \cdot \left(\vec q_i-\vec Q\right)\ e^{-\frac{|\vec q_i-\vec Q|^2}{\sigma^2 }} $$
 where $\vec Q$ is a random location in the fluid domain and $\sigma$ is a random width. The same uniform $A$ matrix is used as in the static case.
 
 The 2D and 3D sphere cases are generated using the residual from an immersed sphere with random center $\vec Q$ and radius $s$, moving in a random direction $\hat m$ in an initially still fluid. Following the Boundary Data Immersion Method \cite{maertens2015accurate,Lauber2022} the conservative  pressure equation is then
