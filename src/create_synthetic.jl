@@ -32,7 +32,7 @@ end
 
 @fastmath kern₀(d) = 0.5+0.5d+0.5sin(π*d)/π
 μ₀(d) = kern₀(clamp(d,-1,1))
-function sphere(;n=32,N=3,T::Type=Float32,x0=rand(T,N),m=rand(T,N),s=rand(),Δt=1)
+function sphere(;n=32,N=2,T::Type=Float32,x0=rand(T,N),m=rand(T,N),s=rand(),Δt=1)
     dims = ntuple(i->n+2,N)
     L,b = zeros(T,dims...,N), zeros(T,dims)
     x0 .*= n/3; x0 .+= (n/3); s *= n/4; m ./= √sum(abs2,m)
