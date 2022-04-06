@@ -62,12 +62,15 @@ end
 savefig("crossloss.png")
 
 using GeometricMultigrid: Vcycle!,mg,mg!
+balance(a,b) = (min(a,-b),max(-a,b))
+myex(f) = balance(extrema(f)...)
+size = (400,400)
 data = Dict(
     "2D-static"=>static(m=[4.,3.]),
     "2D-dipole"=>dipole(x0=[1,0.8],s=0.05,m=[2.,1.]),
     "2D-sphere"=>sphere(x0=[0.,0.7],s=0.6,m=[1.,1.])
 )
-p = []; size = (400,400)
+p = []; 
 for name in ["2D-static", "2D-dipole", "2D-sphere"]
     # machine precision solution
     A,b = data[name]
@@ -82,12 +85,10 @@ for name in ["2D-static", "2D-dipole", "2D-sphere"]
     end
     y .-= x
     # plots
-    push!(p,heatmap(b.data[x.R];size,legend=false,axis=nothing,clim=extrema(b.data)))
-    push!(p,heatmap(st.r.data[x.R];size,legend=false,axis=nothing,clim=extrema(b.data ./10)))
+    push!(p,heatmap(b.data[x.R];size,legend=false,axis=nothing,c=:RdBu,clim=myex(b.data)))
+    push!(p,heatmap(st.r.data[x.R];size,legend=false,axis=nothing,c=:RdBu,clim=myex(b.data ./10)))
     push!(p,heatmap(x.data[x.R];size,legend=false,axis=nothing,clim=extrema(x.data)))
     push!(p,heatmap(y.data[x.R];size,legend=false,axis=nothing,clim=extrema(x.data ./10)))
 end
 plot(permutedims(reshape(p,(4,3)))...,layout=(4,3),size=(1200,1600))
 savefig("synthetic.png")
-plot(p...,layout=(3,4),size=(1600,1200))
-savefig("synthetic2.png")
