@@ -1,4 +1,4 @@
-\documentclass[review]{elsarticle}
+\documentclass[]{elsarticle}
 
 \usepackage{lineno,hyperref}
 \modulolinenumbers[5]
@@ -11,6 +11,7 @@
 \usepackage{subcaption}
 \usepackage{amsmath}
 \usepackage{xcolor}
+\usepackage{svg}
 %%%%%%%%%%%%%%%%%%%%%%%
 
 \begin{document}
@@ -62,7 +63,7 @@ The discrete Poisson equation in the projection step is defined as
 \begin{equation}\label{eq:axb}
     A x = b
 \end{equation}
-where $x$ is the unknown pressure field vector, $b$ is the source term proportional to the divergence of the velocity field to be projected, and $A$ is the discrete matrix for the Poisson operator. For a conservative Poisson operator, $A$ is symmetric, has zero-sum rows and columns, is negative semi-definite, and has a single zero eigenvalue. The matrix is also extremely sparse. While the solution vector size $N$ may easily be $10^6-10^8$, a second-order scheme on structured grids in $M$ dimensions result in only $M$ non-zero sub-diagonals.
+where $x$ is the unknown pressure field vector, $b$ is the source term proportional to the divergence of the velocity field to be projected, and $A$ is the discrete matrix for the Poisson operator. For a conservative Poisson operator, $A$ is symmetric, has zero-sum rows and columns, is negative semi-definite, and has a single zero eigenvalue. \textcolor{blue}{The zero eigenvalue means the solution is unique up to an additive constant, in agreement with the derivative action of the pressure on the velocity-divergence. While it is possible to add an additional condition to the matrix, this is not required and has no impact on the projection problem or the measured pressure forces.} The matrix is also extremely sparse. While the solution vector size $N$ may easily be $10^6-10^8$, a second-order scheme on structured grids in $M$ dimensions result in only $M$ non-zero sub-diagonals.
 
 Iterative methods solve equation \ref{eq:axb} by updating an approximate solution $x^k$ to a new solution $x^{k+1}$ with reduced error. As the problem is linear, the equation for the update $\epsilon$ is simply
 \begin{equation}\label{eq:aer} 
@@ -122,34 +123,19 @@ The data-driven solver and all test cases presented in the following sections ar
 
 \begin{figure}
     \centering
-    \begin{subfigure}[b]{0.3\textwidth}
-        \centering
-        \includegraphics[width=\textwidth]{figures/2D-static.png}
-        \caption{2D-static}
-        \label{fig:2D-static}
-    \end{subfigure}
-    \begin{subfigure}[b]{0.3\textwidth}
-        \centering
-        \includegraphics[width=\textwidth]{figures/2D-dipole.png}
-        \caption{2D-dipole}
-        \label{fig:2D-mu}
-    \end{subfigure}
-    \begin{subfigure}[b]{0.3\textwidth}
-        \centering
-        \includegraphics[width=\textwidth]{figures/2D-sphere.png}
-        \caption{2D-sphere}
-        \label{fig:2D-sphere}
-    \end{subfigure}
-    \caption{Sample solutions (left) from the data-sets of three of the six synthetic cases. \textcolor{blue}{Also shown are the solution errors (middle) and residuals (right) using the data-driven solvers using after reducing the residual norm by $10^{-3}$.}}
+    \includegraphics[width=0.8\textwidth]{figures/synthetic}
+    \caption{\textcolor{blue}{Examples from the 2D static (left), dipole (center), and sphere (right) synthetic cases. The initial residual $r^0$ (row-1) and 10x residual after one data-driven V-cycle $10r^1$ (row-2) plotted on the same scale. The solution after one data-driven V-cycle $x^1$ (row-3) and it's 10x error compared to a machine precision solution $10\epsilon^1$ (row-4) plotted on the same scale.}}
     \label{fig:synthetic cases}
 \end{figure}
 
 \section{Synthetic Discrete Poisson System Results}
 
-\textcolor{blue}{A set of six synthetic cases were developed to establish the ability of the data-driven approach to project out residuals located at domain boundaries, body boundaries, or within the fluid. The three 2D cases are shown in Figure~\ref{fig:synthetic cases}, and each has a matching 3D case. The `static' cases feature a randomized pressure gradient throughout the domain produced by residuals on the domain boundaries. The `dipole' and `sphere' cases feature residuals on a random dipole or on the boundary of a random immersed sphere within an otherwise quiescent flow. Neumann conditions are applied on the domain and sphere boundaries using the Boundary Data Immersion Method (BDIM) to adjust the $A$ matrix coefficients, as described and validated in \cite{maertens2015accurate,Lauber2022}. The  generative equations for each synthetic case are given in \ref{app synth}.}
+\textcolor{blue}{A set of six synthetic cases were developed to establish the ability of the data-driven approach to project out residuals located at (i) domain boundaries, (ii) within the fluid, or (iii) on body boundaries. The three 2D cases and their highly localize residuals are shown in Figure~\ref{fig:synthetic cases}, and each has a matching 3D case. The `static' cases feature a randomized pressure gradient throughout the domain produced by residuals only on the domain boundaries (i). The `dipole' and `sphere' cases feature residuals on a random dipole in the fluid (ii) or on the boundary of a random immersed sphere (iii). Neumann conditions are applied on the domain and sphere boundaries using the Boundary Data Immersion Method (BDIM) to adjust the $A$ matrix coefficients, as described and validated in \cite{maertens2015accurate,Lauber2022}. The  generative equations for each synthetic case are given in \ref{app synth}.}
 
 %All cases are initialized with $x^0=0$ and all cases feature initially localized residuals; i.e. $r^0\ne0$ only in a fraction of the cells, but $x$ must be updated throughout the domain, starkly illustrating the elliptic nature of the projection step.
-A data-driven GMG solver is optimized for each synthetic case using 100 randomized training examples. \textcolor{blue}{Figure~\ref{fig:synthetic cases} shows the velocity residual distribution produced by the trained solvers using a tolerance of $|r^k|_2/|r^0|_2<10^{-3}$, as well as the error in the pressure compared to a result obtained using a classic GMG method converged to machine precision. The results show that the initially highly-localized residual is project and distributed throughout the domain, without build-up on the domain or immersed boundaries.} 
+A data-driven GMG solver is optimized for each synthetic case using 100 randomized training examples. \textcolor{blue}{Figure~\ref{fig:synthetic cases} shows the residual and error of each case after \textit{one} data-driven V-cycle. The results show that the initially highly-localized residual is projected throughout the domain, without build-up of error on the domain or immersed boundaries. Repeated V-cycles drives the residual and error to machine zero in every case.} 
+
+Figure~\ref{fig:cross plot} quantifies the generalization performance of each trained projection method on 100 unseen test examples for each case. \textcolor{blue}{The results for a Jacobi-smoothed GMG V-cycle are shown for comparison as this is the initial condition for the \textit{untrained} data-driven method.} After training, the data-driven method vastly outperform the Jacobi V-cycle, doubling the residual loss on the 3D-dipole case and providing nearly 30-fold improvement on the 3D-static case. While the performance of the data-driven projection method is best when testing and training on the same case, most of the solvers still improve on the Jacobi-smoothed GMG performance for cases outside of their training set. Indeed, the solver trained on the 2D-sphere generalizes essentially as well as a solver trained on the `union' of the all training case data. The exceptions are the static cases, with the solver trained on the 2D-static case failing to converge on three of the other test cases. Note that despite identical $A$ matrices in the static and dipole cases, the performance of the those solvers are completely different. This indicates that the data-driven methods are specializing based on the residual data as well as the matrix structure, a feature unique to this approach.
 
 \begin{figure}
     \centering
@@ -170,9 +156,7 @@ A data-driven GMG solver is optimized for each synthetic case using 100 randomiz
     \label{fig:synthetic results}
 \end{figure}
 
-Figure~\ref{fig:cross plot} quantifies the generalization performance of each trained projection method on 100 unseen test examples for each case. \textcolor{blue}{The results for a Jacobi-smoothed GMG V-cycle are shown for comparison as this is the initial condition for the \textit{untrained} data-driven method.} After training, the data-driven method vastly outperform the Jacobi V-cycle, doubling the residual loss on the 3D-dipole case and providing nearly 30-fold improvement on the 3D-static case. While the performance of the data-driven projection method is best when testing and training on the same case, most of the solvers still improve on the Jacobi-smoothed GMG performance for cases outside of their training set. Indeed, the solver trained on the 2D-sphere generalizes essentially as well as a solver trained on the `union' of the all training case data. The exceptions are the static cases, with the solver trained on the 2D-static case failing to converge on three of the other test cases. Note that despite identical $A$ matrices in the static and dipole cases, the performance of the those solvers are completely different. This indicates that the data-driven methods are specializing based on the residual data as well as the matrix structure, a feature unique to this approach.
-
-\textcolor{blue}{Next, the acceleration of the data-driven projection method is evaluated against high-performance GMG solvers using classic stationary smoothers; Gauss-Sidel and SOR.} The `union'-trained data-driven solver is chosen and 100 tests are generated for each case on different grids to test the ability of the data-driven method to generalize to new grid sizes.
+\textcolor{blue}{Finally, the acceleration of the data-driven projection method is evaluated against high-performance GMG solvers using classic stationary smoothers; Gauss-Sidel and SOR.} The `union'-trained data-driven solver is chosen and 100 tests are generated for each case on different grids to test the ability of the data-driven method to generalize to new grid sizes.
 
 The results in Figure~\ref{fig:synthetic time} show that the data-driven method has no issue projecting the velocity divergence on unseen grid sizes, reducing the residual by $10^{-3}$ in only 2-5x the time of a single Jacobi-smoothed V-cycle. \textcolor{blue}{This is chosen as our unit of time since Jacobi-smoothing requires the smallest possible number of operations per V-cycle on a given grid.} As the pseudo-inverse smoother is many times faster than the Gauss-Sidel and SOR smoothers, this results in an overall 80-210\% speed-up (mean: 133\%) relative to classic GMG solvers. Note that this speed-up will be even more favorable in parallel computation as the new smoother operates directly on the local residual without back-propagation, eliminating any additional communication.
 
@@ -184,18 +168,19 @@ The results in Figure~\ref{fig:synthetic time} show that the data-driven method 
         \caption[-1mm]{Circle flow}
     \end{subfigure}
     \begin{subfigure}[b]{\textwidth}
+    
         \centering
         \includegraphics[width=\textwidth]{figures/donuttriple.png}
-        \caption{Slice of 3D torus (donut) flow}
+        \caption{Slice through 3D donut flow}
     \end{subfigure}
-    \begin{subfigure}[c]{0.6\textwidth}
+    \begin{subfigure}[c]{\textwidth}
         \centering
-        \includegraphics[width=\textwidth]{figures/TGVtriple.png}
-        \caption{Slice of 3D Taylor-Green Vortex}
+        \includegraphics[width=\textwidth,trim={0 150 0 0},clip=true]{figures/TGVtriple.png}
+        \caption{Slice through 3D Taylor-Green Vortex (TGV)}
     \end{subfigure}
-    \begin{subfigure}[c]{0.6\textwidth}
+    \begin{subfigure}[c]{\textwidth}
         \centering
-        \includegraphics[width=\textwidth]{figures/wingtriple.png}
+        \includegraphics[width=\textwidth,trim={0 100 0 60},clip=true]{figures/wingtriple.png}
         \caption{Flapping wing}
     \end{subfigure}
     \begin{subfigure}[b]{\textwidth}
@@ -204,7 +189,7 @@ The results in Figure~\ref{fig:synthetic time} show that the data-driven method 
         \caption{Swimming shark}
     \end{subfigure}
     \hfill
-    \caption{Snapshots from the five flow simulation cases showing the pressure solution (left), the initial residual (middle), and the residual after a single V-cycle (right) using the data-driven projection method. The Taylor-Green Vortex and torus flow are 3D, the flapping wing is dynamic without a background flow and the swimming shark is a deforming geometry. All residuals are visualized using $\log_{10}\text{abs}(r)$ on the same scale, $10^{-6} \ldots 10^{-1}$.}
+    \caption{Snapshots from the five flow simulation cases showing the pressure solution (left), the initial residual $|r^0|$ (middle), and after a single V-cycle $|r^1|$ (right) using the data-driven projection method. The TGV and donut flow are 3D, the flapping wing is dynamic without a background flow and the swimming shark is a deforming geometry. All residuals are visualized on the same log-scale, $10^{-6} \ldots 10^{-1}$. The TGV and wing images have been zoomed in for display purposes.}
     \label{fig:simulation cases}
 \end{figure}
 
