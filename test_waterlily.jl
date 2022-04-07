@@ -40,12 +40,12 @@ begin
     cats = ["Jacobi","transfer","⅛","¼","½","1"]
     ctg = CategoricalArray(repeat(cats,inner=length(data)))
     levels!(ctg,cats)
-    groupedbar(scaleloss', size = (420,400),
-                group=ctg, legend=:bottomright, palette=:Greens_6,
+    groupedbar(scaleloss', size = (500,400),
+                group=ctg, legend=:outerbottomright, palette=:Greens_6,
                 yaxis=("log₁₀ residual reduction",:flip),
                 xaxis=("cases",(1:length(data),keys(data))),)
 end
-savefig("scaleloss.png")
+savefig("scaleloss.pdf")
 
 begin
     scaledata = create_waterlily(p=4)
@@ -96,11 +96,11 @@ begin
     ctg = CategoricalArray(repeat(cats,inner=n))
     levels!(ctg,cats)
     groupedbar(crosscount',size=(400,400),
-                group=ctg, legend=:bottomright,c=colors,
+                group=ctg, legend=:topleft,c=colors,
                 yaxis=("relative time"),
                 xaxis=("cases",(1:length(data),keys(data))),)
 end
-savefig("crosscount.png")
+savefig("crosscount.pdf")
 
 # plot best pseudo-inverse functions across examples
 begin

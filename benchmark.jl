@@ -30,14 +30,14 @@ end
 
 begin # plot
     using StatsPlots,CategoricalArrays
-    cats = ["Gauss-Sidel","SOR","Ã⁻¹ union"]
+    cats = ["GS","SOR","Ã⁻¹"]
     n = length(data)
     colors = repeat([palette(:default)[2],palette(:default)[4],palette(:default)[3]],inner=n)
     ctg = CategoricalArray(repeat(cats,inner=n))
     levels!(ctg,cats)
-    groupedbar((counts.*time_factor)',size=(400,350),
-                group=ctg,c=colors,legend=:bottomright, 
+    groupedbar((counts.*time_factor)',size=(500,400),
+                group=ctg,c=colors,legend=:outerbottomright, 
                 yaxis=("relative time"),
                 xaxis=("cases",(1:n,keys(data)),60))
 end
-savefig("synthetic_timing.png")
+savefig("synthetic_timing.pdf")
