@@ -196,20 +196,12 @@ The results in Figure~\ref{fig:synthetic time} show that the data-driven method 
 
 Five unsteady incompressible simulation cases were used to further characterize the accelerated projection method, Figure \ref{fig:simulation cases}. \textcolor{blue}{The first three cases are variations on standard unsteady flow benchmarks, while the second two are variations of recent validated biologically-inspired flows \cite{Lauber2022}.} The simulations feature significantly different physics to test the accelerated projection performance from flows with and without background velocities, immersed geometries, body motion, and body deformation, as well as using computational grids of different sizes and aspect ratios. \textcolor{blue}{All simulations use the same extensively validated unsteady incompressible Navier-Stokes BDIM solver \cite{maertens2015accurate,Lauber2022} and 100 Poisson matrices $A$ and initial residuals $r^0$ are copied from each unsteady simulation to form the training and testing data. The details of each case are found in \ref{app flow}.}
 
-Figure \ref{fig:simulation cases} shows the pressure solutions, initial residual field, and the residual after a single V-cycle of the data-driven GMG method trained on each case. The results show that the residual decreases throughout the domain, including at the domain and immersed boundaries. \textcolor{blue}{This is further verified by Fig~\ref{fig:simulation forces}, which compares the unsteady pressure force on the circle flow (case a) and the swimming shark (case b) using both the data-driven and Gauss-Sidel smoothed GMG solvers. In both cases, the data-driven method matches the Gauss-Sidel forces for the same residual tolerance.} As such, the new data-driven method is shown to produce uniformly valid solutions despite only being trained to optimize the global residual loss.
+Figure \ref{fig:simulation cases} shows the pressure solutions, initial residual field, and the residual after a single V-cycle of the data-driven GMG method trained on each case. The results show that the residual decreases throughout the domain, including at the domain and immersed boundaries. \textcolor{blue}{This is further verified by Fig~\ref{fig:simulation forces}, which shows the unsteady pressure force the swimming shark case using the data-driven GMG solver is indistinguishable from the Gauss-Sidel smoothed results.} As such, the new data-driven method is shown to produce uniformly valid solutions despite only being trained to optimize the global residual loss.
 
 \begin{figure}
     \centering
-    \begin{subfigure}[b]{0.47\textwidth}
-        \centering
-        \caption{Cylinder pressure}
-    \end{subfigure}
-    \hfill
-    \begin{subfigure}[b]{0.47\textwidth}
-        \centering
-        \caption{Swimming shark}
-    \end{subfigure}
-    \caption{Integrated pressure forces on the (a) cylinder and (b) swimming shark test cases using the data-driven and Gauss-Sidel GMG solvers for different residual tolerance levels. The $|r^k/r^0|<10^{-3}$ level is indistinguishable from that obtained driving the residuals to machine zero.}
+    \includegraphics[width=0.7\textwidth]{figures/forces.pdf}
+    \caption{\textcolor{blue}{Integrated thrust and side pressure forces the swimming shark test case using the Gauss-Sidel (GS) and data-driven ($\tilde A^{-1}$) GMG solvers and $|r^k/r^0|<10^{-3}$ tolerance level.}}
     \label{fig:simulation forces}
 \end{figure}
 
