@@ -31,11 +31,12 @@ end
 begin # plot
     using StatsPlots,CategoricalArrays
     cats = ["GS","SOR","Ã⁻¹"]
+    data = create_synthetic(len=1)
     n = length(data)
     colors = repeat([palette(:default)[2],palette(:default)[4],palette(:default)[3]],inner=n)
     ctg = CategoricalArray(repeat(cats,inner=n))
     levels!(ctg,cats)
-    groupedbar((counts.*time_factor)',size=(500,400),
+    groupedbar(rel_time',size=(500,400),
                 group=ctg,c=colors,legend=:outerbottomright, 
                 yaxis=("relative time"),
                 xaxis=("cases",(1:n,keys(data)),60))
